@@ -36,7 +36,7 @@ public class Main {
         
       try {
         FileReader fr =null;
-        String pathPuntoMyPython="..\\Compilador-MyPython\\docs\\Prueba 4.mypython";
+        String pathPuntoMyPython="..\\Compilador\\docs\\Prueba 4.mypython";
         if (args.length >= 1) {
           pathPuntoMyPython = args[0];
         }
