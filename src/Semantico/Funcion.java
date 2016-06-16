@@ -24,4 +24,13 @@ public class Funcion {
     public boolean validaparametro(int numero, RegistroExpresion param){
         return parametros.get(numero).getTipo()==param.getTipo();
     }
+
+    public ArrayList<RSId> getVariablesLocales() {
+      return new ArrayList<>(variablesLocales.values());
+    }
+
+    public ArrayList<Registro> getCodigo() {
+        return codigo;
+    }
+    
 }

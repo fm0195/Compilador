@@ -11,5 +11,12 @@ public class RSAsignacion extends RegistroExpresion{
         this.expresion = expresion;
         this.id = id;
     }
-   
+
+    public Registro getExpresion() {
+        return expresion;
+    }
+
+    public String getId() {
+        return id.getNombre();
+    }
 }
