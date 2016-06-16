@@ -1,4 +1,3 @@
-
 package Semantico;
 
 import java.util.ArrayList;
@@ -171,6 +170,7 @@ public class Analizador {
         if (!(pilaSemantica.peek() instanceof ErrorSemantico)){
             RSVariable var = (RSVariable)pilaSemantica.pop();
             if (variablesGlobales.containsKey(var.getNombre())){
+              if (!(pilaSemantica.peek() instanceof ErrorSemantico)){
                     if(autoAsignacion){
                         if (variablesGlobales.get(var.getNombre()).isIsAsignada()){
                             pilaSemantica.push(var);
@@ -194,7 +194,7 @@ public class Analizador {
                         getErrores().add(e);
                         pilaSemantica.push(e);
                     }
-                
+              }
             }else{
                 ErrorSemantico e = new ErrorSemantico(" variable "+var.getNombre()+", no definida", var.linea);
                 getErrores().add(e);

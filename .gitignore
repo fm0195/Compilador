@@ -4,7 +4,6 @@
 .mtj.tmp/
 
 # Package Files #
-*.jar
 *.war
 *.ear
 
@@ -61,3 +60,8 @@ $RECYCLE.BIN/
 
 # Windows shortcuts
 *.lnk
+build/built-jar.properties
+src/scanner/Scanner.java
+/dist/
+/nbproject/private/
+/build/
