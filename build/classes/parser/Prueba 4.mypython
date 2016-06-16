@@ -1,0 +1,46 @@
+def cuentaAbajo(n):
+    while n>=0: # Todo correcto
+        print(n)
+        n= n-1
+	;
+#a = int(input("Digite un numero"))
+cuentaAbajo(a)
+
+
+
+int x
+
+x=1
+while x<=10: # anidado con un if
+    if x== 5 or x==8:
+        print(x)
+	   break
+	;
+    x= x+1
+;
+
+a=1
+while : # no trae expresion
+    print(a)   
+    a=a+1
+;
+
+print(a)
+
+
+x=0
+suma = 0
+while x<20 # no viene : debe leer hasta el siguiente :
+    print(x # este error no lo encuentra hasta poner los :
+    suma = suma + x
+    x= x+2
+;
+
+while x<20:
+    print(x)
+    suma = suma + x
+    x= x+2
+;
+
+print ("La suma total es:", suma)
+

@@ -1,0 +1,1438 @@
+/* Simple +/-/* expression language; parser evaluates constant expressions on the fly*/
+package parser;
+import parser.Nodo;
+import java_cup.runtime.*;
+import java.util.ArrayList;
+import Scanner_Jflex.MyPythonScanner;
+import scanner.BooleanToken;
+import scanner.EOFToken;
+import scanner.ErrorToken;
+import scanner.FloatToken;
+import scanner.IdentifierToken;
+import scanner.IntegerToken;
+import scanner.NullToken;
+import scanner.OperatorToken;
+import scanner.ReservedWordToken;
+import scanner.StringToken;
+import scanner.Token;
+import scanner.SeparatorToken;
+import scanner.CharToken;
+import scanner.IImprimible;
+parser code {:
+    private int _ultimaLineaDerecha=1;
+    private int _ultimaLineaIzquierda=1;
+    private ArrayList<IImprimible> errores= new ArrayList<IImprimible>();
+    MyPythonScanner s;
+    public Parser(MyPythonScanner s){ super(s); this.s=s; }
+    private void addError(IImprimible nodo){
+        errores.add(nodo);
+    }
+    public ArrayList<IImprimible> erroresSintacticos(){
+        return errores;
+    }
+    public ArrayList<IImprimible> erroresLexicos(){
+        return  s.getErrores();
+    }
+:}
+
+/* define how to connect to the scanner! */
+init with {:  :};
+scan with {: java_cup.runtime.Symbol t;
+      do {        
+        t = s.next_token();
+      } while (((Symbol)t.value).sym == sym.TAB || ((Symbol)t.value).sym == sym.ERROR );
+      return t;  :};
+/* Terminals (tokens returned by the scanner). */
+terminal ID, TAB, PARENTESISIZQ, PARENTESISDER, CORCHETEIZQ, CORCHETEDER, COMA, PUNTO;
+terminal DOSPUNTOS, PUNTOYCOMA, CAMBIOLINEA, MAS, MENOS, MULT, DIV, DIVENT, MOD;
+terminal POTENCIA, ASIGNACION, IGUALCOMP, DIFERENTE, DISTINTO, MAYORIGUAL, MENORIGUAL;
+terminal MASIGUAL, MENOSIGUAL, MULTIGUAL, DIVIGUAL, POTIGUAL, DIVENTIGUAL, MODIGUAL;
+terminal SHL, SHR, BITAND, BITOR, BITXOR, BITNOT,MAYOR,MENOR;
+terminal AND, BREAK, CLASS, CONTINUE, DEF, ELIF, ELSE, EXCEPT, FINALLY, FOR, IF;
+terminal IN, INPUT, IS, NOT, OR, PRINT, RETURN, TRY, WHILE, INT, LIST, FLOAT, STRING;
+terminal BOOLEAN, CHAR, LITERALINT, LITERALFLOAT, LITERALSTRING, LITERALCHAR, ERROR;
+terminal DEL, FROM, LITERALFALSE, PASS, RAISE, ASSERT, LAMBDA, IMPORT, GLOBAL;
+terminal EXEC, LITERALTRUE, LITERALNULL,EOFINAL,RANGE;
+
+/* Non terminals */
+non terminal funcDef, parametros, listaArg, tipo, estructura1, 
+funciones, variablesGlobales, codigoPrincipal, codigoFuncion, declaracionVariables,
+codigo, asignacion,opAsig,expresion,objeto,
+llamadoFuncion,lista,argumentosLista,elementoLista,variableIndexada,formaLista,
+corcheteIndexado,argumentosFuncion, corcheteAux,
+variablesLocales, while, expresionBooleana,
+if,tryexcept,deffinally,for,alcanceFor,rangoObjetos,rango,defRango,
+objetoRango,elseIf, return,except,puntoComa, declaracionMultiple, argumentosInput,
+defClass,atributos,estructura2,programa;
+
+/* Precedences */
+precedence left OR;
+precedence left AND;
+precedence left NOT;
+precedence left IS, IN, MENOR, MENORIGUAL, MAYOR, MAYORIGUAL, DISTINTO, DIFERENTE, IGUALCOMP;
+precedence left BITOR;
+precedence left BITXOR;
+precedence left BITAND;
+precedence left SHL, SHR;
+precedence left MAS, MENOS;
+precedence left MULT,DIV,MOD,DIVENT;
+precedence left BITNOT;
+precedence left POTENCIA;
+precedence left PARENTESISIZQ, PARENTESISDER;
+precedence left BREAK, CONTINUE;
+/* The grammar rules */
+
+programa::=estructura1:e
+           {:
+                RESULT = new Nodo("PROGRAMA", new Nodo[]{(Nodo)e});
+            :}
+           |estructura2:e
+           {:
+                RESULT = new Nodo("PROGRAMA", new Nodo[]{(Nodo)e});
+            :}
+            |
+            {:
+                addError(new Nodo("ERROR, NO HAY CÓDIGO"));
+                RESULT = new Nodo("ERROR, NO HAY CÓDIGO");
+            :}
+;
+
+estructura2::=defClass:dc atributos:a funciones:df puntoComa:pc codigoPrincipal:cp
+        {:
+            RESULT = new Nodo("ESTRUCTURA2", new Nodo[]{(Nodo)dc,(Nodo) a,(Nodo) df,(Nodo)pc,(Nodo)cp});
+        :}
+        |defClass:dc funciones:df puntoComa:pc codigoPrincipal:cp
+        {:
+            RESULT = new Nodo("ESTRUCTURA2", new Nodo[]{(Nodo)dc,(Nodo) df,(Nodo)pc,(Nodo)cp});
+        :}
+        |defClass:dc atributos:a puntoComa:pc codigoPrincipal:cp
+        {:
+            RESULT = new Nodo("ESTRUCTURA2", new Nodo[]{(Nodo)dc,(Nodo) a,(Nodo)pc,(Nodo)cp});
+        :}
+        |defClass:dc atributos:a puntoComa:pc 
+        {:
+            Nodo errorC=new Nodo("Error: Falta el codigo principal");
+            addError(errorC);
+            RESULT = new Nodo("ESTRUCTURA2", new Nodo[]{(Nodo)dc,(Nodo) a,(Nodo)pc,errorC});
+        :}
+        |defClass:dc funciones:df puntoComa:pc 
+        {:
+            Nodo errorC=new Nodo("Error: Falta el codigo principal");
+            addError(errorC);
+            RESULT = new Nodo("ESTRUCTURA2", new Nodo[]{(Nodo)dc,(Nodo) df,(Nodo)pc,errorC});
+        :}
+        |defClass:dc atributos:a funciones:df puntoComa:pc
+        {:
+            Nodo errorC=new Nodo("Error: Falta el codigo principal");
+            addError(errorC);
+            RESULT = new Nodo("ESTRUCTURA2", new Nodo[]{(Nodo)dc,(Nodo) a,(Nodo) df,(Nodo)pc,errorC});
+        :}
+;
+estructura1 ::= funciones:df variablesGlobales:vg codigoPrincipal:cp EOFINAL
+                {:
+                    RESULT = new Nodo("ESTRUCTURA1", new Nodo[]{(Nodo)df,(Nodo) vg,(Nodo) cp});
+                :}
+                |funciones:df variablesGlobales:vg codigoPrincipal:cp
+                {:
+                    RESULT = new Nodo("ESTRUCTURA1", new Nodo[]{(Nodo)df,(Nodo) vg,(Nodo) cp});
+                :}
+                |funciones:df variablesGlobales:vg EOFINAL
+                {:
+                    addError( new Nodo("Error: Falta el codigo principal"));
+                    RESULT = new Nodo("Error: Falta el codigo principal", new Nodo[]{(Nodo)df,(Nodo) vg});
+                :}
+                |funciones:df variablesGlobales:vg
+                {:
+                    addError( new Nodo("Error: Falta el codigo principal"));
+                    RESULT = new Nodo("Error: Falta el codigo principal", new Nodo[]{(Nodo)df,(Nodo) vg});
+                :}
+;
+funciones ::= funcDef:fd  funciones:df 
+                            {:
+                                RESULT = new Nodo("DECLARACION FUNCIONES", new Nodo[]{(Nodo)fd,(Nodo) df});
+                            :}
+                        | 
+                            {:
+                                RESULT = new Nodo();
+                            :}
+;
+variablesGlobales ::= declaracionVariables:dv
+                    {:
+                        RESULT = new Nodo("VARIABLES GLOBALES", new Nodo[]{(Nodo) dv});
+                    :}
+                    | 
+                    {:
+                        RESULT = new Nodo();
+                    :}
+;
+atributos ::= declaracionVariables:dv
+                    {:
+                        RESULT = new Nodo("ATRIBUTOS DE LA CLASE", new Nodo[]{(Nodo) dv});
+                    :}
+                    | 
+                    {:
+                        RESULT = new Nodo();
+                    :}
+;
+
+variablesLocales ::= declaracionVariables:dv
+                    {:
+                        RESULT = new Nodo("VARIABLES LOCALES", new Nodo[]{(Nodo) dv});
+                    :}
+                    | 
+                    {:
+                        RESULT = new Nodo();
+                    :}
+;
+declaracionVariables ::= tipo:t ID:i
+                    {:
+                        Nodo id=new Nodo((String)((java_cup.runtime.Symbol)i).value);
+                        RESULT = new Nodo("DECLARACION VARIABLES",new Nodo[]{(Nodo) t, id});
+                    :}
+                    | tipo:t ID:i COMA:c declaracionMultiple:dm 
+                    {:
+                        Nodo id=new Nodo((String)((java_cup.runtime.Symbol)i).value);
+                        Nodo com=new Nodo((String)((java_cup.runtime.Symbol)c).value);
+                        RESULT = new Nodo("DECLARACION VARIABLES",new Nodo[]{(Nodo) t, id, com, (Nodo) dm});
+                    :}
+                    | tipo:t ID:i declaracionVariables:dv 
+                    {:
+                        Nodo id=new Nodo((String)((java_cup.runtime.Symbol)i).value);
+                        RESULT = new Nodo("DECLARACION VARIABLES",new Nodo[]{(Nodo) t, id, (Nodo) dv});
+                    :}
+                    |tipo declaracionVariables:dv
+                    {:
+                        addError(new Nodo("Error en la declaracion de la variable, en la linea: "+_ultimaLineaIzquierda));
+                        RESULT = new Nodo("Error en la declaracion de la variable, en la linea: "+_ultimaLineaIzquierda,
+                                     new Nodo[]{(Nodo)dv});
+                    :}
+                    |tipo:t error:e 
+                    {:
+                        addError(new Nodo("Error en la declaracion de la variable, en la linea: "+_ultimaLineaIzquierda));
+                        RESULT = new Nodo("Error en la declaracion de la variable, en la linea: "+_ultimaLineaIzquierda);
+                    :}
+;
+declaracionMultiple ::= ID:i COMA:c declaracionMultiple:dm
+                    {:
+                        Nodo id=new Nodo((String)((java_cup.runtime.Symbol)i).value);
+                        Nodo com=new Nodo((String)((java_cup.runtime.Symbol)c).value);
+                        RESULT = new Nodo("DECLARACION MULTIPLE",new Nodo[]{ id, com, (Nodo) dm});
+                    :}
+                    | ID:i
+                    {:
+                        _ultimaLineaDerecha=((java_cup.runtime.Symbol)i).right;
+                        _ultimaLineaIzquierda=((java_cup.runtime.Symbol)i).left;
+                        Nodo id=new Nodo((String)((java_cup.runtime.Symbol)i).value);
+                        RESULT = new Nodo("DECLARACION MULTIPLE",new Nodo[]{ id});
+                    :}
+                    | ID:i declaracionVariables:dv 
+                    {:
+                        Nodo id=new Nodo((String)((java_cup.runtime.Symbol)i).value);
+                        RESULT = new Nodo("DECLARACION VARIABLES",new Nodo[]{id,(Nodo) dv});
+                    :}
+;
+codigoPrincipal ::= codigo:c codigoPrincipal:rc
+                    {:
+                        RESULT = new Nodo("CODIGO PRINCIPAL", new Nodo[]{(Nodo)c,(Nodo)rc});
+                    :}
+                    | codigo:c
+                    {:
+                        RESULT = new Nodo("CODIGO PRINCIPAL", new Nodo[]{(Nodo)c});
+                    :}
+;
+codigoFuncion ::=   codigo:rc codigoFuncion:cf
+                    {:
+                        RESULT = new Nodo("CODIGO", new Nodo[]{(Nodo)rc, (Nodo) cf});
+                    :}
+                    |
+                    {:
+                        RESULT = new Nodo("CODIGO");
+                    :}
+
+                    | codigoFuncion:rc1 BREAK:b codigoFuncion:rc2
+                    {:
+                        Nodo id=new Nodo((String)((java_cup.runtime.Symbol)b).value);
+                        _ultimaLineaDerecha=((java_cup.runtime.Symbol)b).right;
+                        _ultimaLineaIzquierda=((java_cup.runtime.Symbol)b).left;
+                        RESULT = new Nodo("CODIGO", new Nodo[]{(Nodo)rc1, id, (Nodo)rc2});
+                    :}
+                    | codigoFuncion:rc1 CONTINUE:b codigoFuncion:rc2
+                    {:
+                        Nodo id=new Nodo((String)((java_cup.runtime.Symbol)b).value);
+                        _ultimaLineaDerecha=((java_cup.runtime.Symbol)b).right;
+                        _ultimaLineaIzquierda=((java_cup.runtime.Symbol)b).left;
+                        RESULT = new Nodo("CODIGO", new Nodo[]{(Nodo)rc1, id, (Nodo)rc2});
+                    :}
+;
+
+codigo ::= expresion:llf
+        {:
+            RESULT = new Nodo("EXPRESION",new Nodo[]{(Nodo) llf});
+        :}
+        | while:w
+            {:
+                RESULT = new Nodo("WHILE",new Nodo[]{(Nodo) w});
+            :}
+         | if :i
+            {:
+                RESULT = new Nodo("IF",new Nodo[]{(Nodo) i});
+            :}
+         |  tryexcept:t
+            {:
+                RESULT = new Nodo("TRY-EXCEPT",new Nodo[]{(Nodo) t});
+            :}
+         |for:f
+            {:
+                RESULT = new Nodo("FOR",new Nodo[]{(Nodo) f});
+            :}
+         | return:f
+         {:
+                RESULT = new Nodo("RETURN",new Nodo[]{(Nodo) f});
+         :}
+         | funcDef
+         {:
+                addError(new Nodo("Error: Declaracion en bloque de codigo, en la linea: "+_ultimaLineaDerecha));
+                RESULT = new Nodo("Error: Declaracion en bloque de codigo, en la linea: "+_ultimaLineaDerecha);
+         :}
+         | tipo
+         {:
+                addError(new Nodo("Error: Declaracion en bloque de codigo, en la linea: "+_ultimaLineaDerecha));
+                RESULT = new Nodo("Error: Declaracion en bloque de codigo: "+_ultimaLineaDerecha);
+         :}
+;
+return ::= RETURN:r expresion:e
+        {:
+            Nodo id=new Nodo((String)((java_cup.runtime.Symbol)r).value);
+            RESULT = new Nodo("CODIGO", new Nodo[]{id, (Nodo)e});
+        :}
+        |RETURN:r
+        {:
+            Nodo id=new Nodo((String)((java_cup.runtime.Symbol)r).value);
+            RESULT = new Nodo("CODIGO", new Nodo[]{id});
+        :}
+;
+for::=FOR:f ID:i IN:in alcanceFor:af DOSPUNTOS:dp codigoFuncion:cf puntoComa:pc
+    {:
+        Nodo forN=new Nodo((String)((java_cup.runtime.Symbol)f).value);
+        Nodo id=new Nodo((String)((java_cup.runtime.Symbol)i).value);
+        Nodo inN=new Nodo((String)((java_cup.runtime.Symbol)in).value);
+        Nodo dosp=new Nodo((String)((java_cup.runtime.Symbol)dp).value);
+        RESULT=new Nodo("Definición del ciclo For",new Nodo[]{forN,id,inN,(Nodo)af,dosp,(Nodo)cf,(Nodo)pc});
+    :}
+    |
+    FOR:f error DOSPUNTOS:dp codigoFuncion:cf puntoComa:pc
+    {:
+        Nodo forN=new Nodo((String)((java_cup.runtime.Symbol)f).value);
+        Nodo id=new Nodo("Error en la declaracion del for, en la línea: "+((java_cup.runtime.Symbol)f).right);
+        addError(id);
+        Nodo dosp=new Nodo((String)((java_cup.runtime.Symbol)dp).value);
+        RESULT=new Nodo("Definición del ciclo For",new Nodo[]{forN,id, dosp,(Nodo)cf,(Nodo)pc});
+    :}
+    |
+    FOR:f error puntoComa:pc
+    {:
+        Nodo forN=new Nodo((String)((java_cup.runtime.Symbol)f).value);
+        Nodo dosp=new Nodo("Error en la definicion del For, en la linea: "+((java_cup.runtime.Symbol)f).right);
+        addError(dosp);
+        RESULT=new Nodo("Definición del ciclo For",new Nodo[]{forN, dosp ,(Nodo)pc});
+    :}
+;
+
+alcanceFor::=rangoObjetos:o
+        {:
+            RESULT=new Nodo("Rango de objetos",new Nodo[]{(Nodo)o});
+        :}   
+        | rango:r
+        {:
+            RESULT=new Nodo("Rango numérico",new Nodo[]{(Nodo)r});
+        :}
+;
+rango::=RANGE:r PARENTESISIZQ:pi defRango:dr PARENTESISDER:pd
+        {:
+            Nodo ran=new Nodo((String)((java_cup.runtime.Symbol)r).value);
+            Nodo piz=new Nodo((String)((java_cup.runtime.Symbol)pi).value);
+            Nodo pder=new Nodo((String)((java_cup.runtime.Symbol)pd).value);
+            RESULT=new Nodo("Range numerico",new Nodo[]{ran,piz,(Nodo)dr,pder});
+        :}
+        |RANGE:r PARENTESISIZQ:pi error PARENTESISDER:pd
+        {:
+            Nodo ran = new Nodo((String)((java_cup.runtime.Symbol)r).value);
+            Nodo piz=new Nodo((String)((java_cup.runtime.Symbol)pi).value);
+            Nodo errorR=new Nodo("Error en los argumentos del rango de un for, en la línea: "+((java_cup.runtime.Symbol)pi).right);
+            addError(errorR);
+            Nodo pder=new Nodo((String)((java_cup.runtime.Symbol)pd).value);
+            RESULT=new Nodo("Range numerico",new Nodo[]{ran,piz,errorR,pder});
+        :}
+        |RANGE:r PARENTESISIZQ:pi defRango:dr
+        {:
+            Nodo ran=new Nodo((String)((java_cup.runtime.Symbol)r).value);
+            Nodo piz=new Nodo((String)((java_cup.runtime.Symbol)pi).value);
+            Nodo pder=new Nodo("Error en la declaración del rango en un for, en la línea: "+((java_cup.runtime.Symbol)pi).right);
+            addError(pder);
+            RESULT=new Nodo("Range numerico",new Nodo[]{ran,piz,(Nodo)dr,pder});
+        :}
+        |RANGE:r PARENTESISIZQ:pi
+        {:
+            Nodo ran=new Nodo((String)((java_cup.runtime.Symbol)r).value);
+            Nodo piz=new Nodo((String)((java_cup.runtime.Symbol)pi).value);
+            Nodo pder=new Nodo("Error en la declaración del rango en un for, en la línea: "+((java_cup.runtime.Symbol)pi).right);
+            addError(pder);
+            RESULT=new Nodo("Range numerico",new Nodo[]{ran,piz,pder});
+        :}
+        |RANGE:r defRango:dr PARENTESISDER:pd
+        {:
+            Nodo ran=new Nodo((String)((java_cup.runtime.Symbol)r).value);
+            Nodo piz=new Nodo("Error en la declaración del rango en un for, en la línea: "+((java_cup.runtime.Symbol)pd).right);
+            addError(piz);
+            Nodo pder=new Nodo((String)((java_cup.runtime.Symbol)pd).value);
+            RESULT=new Nodo("Range numerico",new Nodo[]{ran,piz,(Nodo)dr,pder});
+        :}
+        |RANGE:r  PARENTESISDER:pd
+        {:
+            Nodo ran=new Nodo((String)((java_cup.runtime.Symbol)r).value);
+            Nodo piz=new Nodo("Error en la declaración del rango en un for, en la línea: "+((java_cup.runtime.Symbol)pd).right);
+            addError(piz);
+            Nodo pder=new Nodo((String)((java_cup.runtime.Symbol)pd).value);
+            RESULT=new Nodo("Range numerico",new Nodo[]{ran,piz,pder});
+        :}
+;
+
+rangoObjetos::=objeto:o
+        {:
+            RESULT=new Nodo("Objeto del rango",new Nodo[]{(Nodo)o});
+        :}
+        |objeto:o COMA:c rangoObjetos:ro
+        {:
+            Nodo coma=new Nodo((String)((java_cup.runtime.Symbol)c).value);
+            RESULT=new Nodo("Objeto del rango",new Nodo[]{(Nodo)o,coma,(Nodo)ro});
+        :}
+;
+
+defRango::=objetoRango:o
+        {:
+            RESULT=new Nodo("Objeto del rango",new Nodo[]{(Nodo)o});
+        :}
+       |objetoRango:o COMA:c objetoRango:o1
+       {:
+            Nodo coma=new Nodo((String)((java_cup.runtime.Symbol)c).value);
+            RESULT=new Nodo("Objeto del rango",new Nodo[]{(Nodo)o,coma,(Nodo)o1});
+        :}
+       |objetoRango:o COMA:c objetoRango:o1 COMA:c1 objetoRango:o2
+       {:
+            Nodo coma=new Nodo((String)((java_cup.runtime.Symbol)c).value);
+            Nodo coma1=new Nodo((String)((java_cup.runtime.Symbol)c1).value);
+            RESULT=new Nodo("Objeto del rango",new Nodo[]{(Nodo)o,coma,(Nodo)o1,coma1,(Nodo)o2});
+        :}
+;
+
+objetoRango::= LITERALINT:li
+        {:
+            _ultimaLineaDerecha=((java_cup.runtime.Symbol)li).right;
+            _ultimaLineaIzquierda=((java_cup.runtime.Symbol)li).left;
+            Nodo n=new Nodo((String)((java_cup.runtime.Symbol)li).value);
+            RESULT=new Nodo("Objeto del rango",new Nodo[]{n});
+        :}
+       | ID:i
+        {:
+            _ultimaLineaDerecha=((java_cup.runtime.Symbol)i).right;
+            _ultimaLineaIzquierda=((java_cup.runtime.Symbol)i).left;
+            Nodo id=new Nodo((String)((java_cup.runtime.Symbol)i).value);
+            RESULT=new Nodo("Objeto del rango",new Nodo[]{id});
+        :}
+       |variableIndexada:vi
+        {:
+            Nodo id=new Nodo((String)((java_cup.runtime.Symbol)vi).value);
+            RESULT=new Nodo("Objeto del rango",new Nodo[]{id});
+        :}
+       |llamadoFuncion:llf
+        {:
+            Nodo llamado=new Nodo((String)((java_cup.runtime.Symbol)llf).value);
+            RESULT=new Nodo("Objeto del rango",new Nodo[]{llamado});
+        :}
+;
+
+tryexcept::= TRY:t DOSPUNTOS:dp codigoFuncion:cf puntoComa:pc except:ex deffinally:f
+        {:
+            Nodo tryN=new Nodo((String)((java_cup.runtime.Symbol)t).value);
+            Nodo dosp=new Nodo((String)((java_cup.runtime.Symbol)dp).value);
+
+            RESULT=new Nodo("Definicion de un try",new Nodo[]{tryN,dosp,(Nodo)cf,(Nodo)pc,
+                            (Nodo)ex,(Nodo)f});
+        :}
+        | TRY:t DOSPUNTOS:dp codigoFuncion:cf puntoComa:pc except:ex deffinally:f
+        {:
+            Nodo tryN=new Nodo((String)((java_cup.runtime.Symbol)t).value);
+            Nodo dosp=new Nodo((String)((java_cup.runtime.Symbol)dp).value);
+
+            RESULT=new Nodo("Definicion de un try",new Nodo[]{tryN,dosp,(Nodo)cf,(Nodo)pc,
+                            (Nodo)ex,(Nodo)f});
+        :}
+        | TRY:t error puntoComa:pc
+        {:
+            Nodo tryN=new Nodo((String)((java_cup.runtime.Symbol)t).value);
+            Nodo errorT=new Nodo("Error en la definición del try, en la línea: "+((java_cup.runtime.Symbol)t).right);
+            addError(errorT);
+            Nodo errorE=new Nodo("Error seccion except no definida, especificamente en la línea del Try: "+((java_cup.runtime.Symbol)t).right);
+           RESULT = new Nodo("TRY",new Nodo[]{tryN,errorT,(Nodo)pc,errorE});
+        :}
+        | TRY:t error codigoFuncion:cf puntoComa:pc except:ex deffinally:f
+        {:
+            Nodo tryN=new Nodo((String)((java_cup.runtime.Symbol)t).value);
+            Nodo errorT=new Nodo("Error en la definición del try, en la línea: "+((java_cup.runtime.Symbol)t).right);
+            addError(errorT);
+           RESULT = new Nodo("TRY",new Nodo[]{tryN,errorT,(Nodo)cf,(Nodo)pc,(Nodo)ex,(Nodo)f});
+        :}
+        | TRY:t error codigoFuncion:cf puntoComa:pc deffinally:f
+        {:
+            Nodo tryN=new Nodo((String)((java_cup.runtime.Symbol)t).value);
+            Nodo errorT=new Nodo("Error en la definición del try, en la línea: "+((java_cup.runtime.Symbol)t).right);
+            addError(errorT);
+            Nodo errorE=new Nodo("Error seccion except no definida, especificamente en la línea del Try: "+((java_cup.runtime.Symbol)t).right);
+            addError(errorE);
+           RESULT = new Nodo("TRY",new Nodo[]{tryN,errorT,(Nodo)cf,(Nodo)pc,errorE,(Nodo)f});
+        :}
+        | TRY:t DOSPUNTOS:dp codigoFuncion:cf puntoComa:pc deffinally:f
+        {:
+            Nodo tryN=new Nodo((String)((java_cup.runtime.Symbol)t).value);
+           Nodo dosp=new Nodo((String)((java_cup.runtime.Symbol)dp).value);
+            Nodo errorE=new Nodo("Error seccion except no definida, especificamente en la línea del Try: "+((java_cup.runtime.Symbol)t).right);
+            addError(errorE);
+           RESULT = new Nodo("TRY",new Nodo[]{tryN,dosp,(Nodo)cf,(Nodo)pc,errorE,(Nodo)f});
+        :}
+;
+
+except::=EXCEPT:ex ID:i DOSPUNTOS:dp1  codigoFuncion:cf1 puntoComa:pc1 
+        {:
+            Nodo except=new Nodo((String)((java_cup.runtime.Symbol)ex).value);
+            Nodo error=new Nodo((String)((java_cup.runtime.Symbol)i).value);
+            Nodo dosp1=new Nodo((String)((java_cup.runtime.Symbol)dp1).value);
+            RESULT=new Nodo("Definicion de un except",new Nodo[]{except,error,dosp1,(Nodo)cf1,(Nodo)pc1});
+        :}
+        |
+        EXCEPT:ex DOSPUNTOS:dp1  codigoFuncion:cf1 puntoComa:pc1 
+        {:
+            Nodo except=new Nodo((String)((java_cup.runtime.Symbol)ex).value);
+            Nodo dosp1=new Nodo((String)((java_cup.runtime.Symbol)dp1).value);
+            //Nodo pcoma1=new Nodo((String)((java_cup.runtime.Symbol)pc1).value);
+            RESULT=new Nodo("Definicion de un except",new Nodo[]{except,dosp1,(Nodo)cf1,(Nodo)pc1});
+        :}
+        |EXCEPT:ex error DOSPUNTOS:dp1  codigoFuncion:cf1 puntoComa:pc1 
+        {:
+            Nodo except=new Nodo((String)((java_cup.runtime.Symbol)ex).value);
+            Nodo errorF=new Nodo("Error en el identificador del except, en la linea: "+((java_cup.runtime.Symbol)ex).right);
+            addError(errorF);
+            Nodo dosp1=new Nodo((String)((java_cup.runtime.Symbol)dp1).value);
+            RESULT=new Nodo("Definicion de un except",new Nodo[]{except,errorF,dosp1,(Nodo)cf1,(Nodo)pc1});
+        :}
+        |EXCEPT:ex ID:i error puntoComa:pc1 
+        {:
+            Nodo except=new Nodo((String)((java_cup.runtime.Symbol)ex).value);
+            Nodo errorE=new Nodo((String)((java_cup.runtime.Symbol)i).value);
+            Nodo errorN=new Nodo("Error en la definición del except, en la linea: "+((java_cup.runtime.Symbol)i).right);
+            addError(errorN);
+            RESULT=new Nodo("Definicion de un except",new Nodo[]{except,errorE,errorN,(Nodo)pc1});
+        :}
+        |EXCEPT:ex error puntoComa:pc1 
+        {:
+            Nodo except=new Nodo((String)((java_cup.runtime.Symbol)ex).value);
+            Nodo errorN=new Nodo("Error en la definición del except, en la linea: "+((java_cup.runtime.Symbol)ex).right);
+            addError(errorN);
+            RESULT=new Nodo("Definicion de un except",new Nodo[]{except,errorN,(Nodo)pc1});
+        :}
+;
+deffinally::= FINALLY:f DOSPUNTOS:dp codigoFuncion:cf puntoComa:pc
+        {:
+            Nodo finallyN=new Nodo((String)((java_cup.runtime.Symbol)f).value);
+            Nodo dosp=new Nodo((String)((java_cup.runtime.Symbol)dp).value);
+            RESULT=new Nodo("Definicion de un finally",new Nodo[]{finallyN,dosp,(Nodo)cf,(Nodo)pc});
+        :}
+        |
+        {:
+            RESULT=new Nodo();
+        :}
+        |FINALLY:f error
+        {:
+           Nodo finallyN=new Nodo((String)((java_cup.runtime.Symbol)f).value);
+           Nodo errorD = new Nodo("Error sintactico en el finally, en la linea: "+((java_cup.runtime.Symbol)f).right);
+           addError(errorD);
+           RESULT=new Nodo("Finally", new Nodo[]{finallyN,errorD});
+        :}
+;
+while ::= WHILE:w expresionBooleana:eb DOSPUNTOS:dp codigoFuncion:c puntoComa:pc
+        {:
+            Nodo whl=new Nodo((String)((java_cup.runtime.Symbol)w).value);
+            Nodo dosPuntos=new Nodo((String)((java_cup.runtime.Symbol)dp).value);
+            RESULT = new Nodo("WHILE",new Nodo[]{whl, (Nodo) eb, dosPuntos,(Nodo) c, (Nodo)pc});
+        :}
+        | WHILE:w error DOSPUNTOS:dp codigoFuncion:c puntoComa:pc
+        {:
+            Nodo whl=new Nodo((String)((java_cup.runtime.Symbol)w).value);
+            Nodo dosPuntos=new Nodo("Error en la definicion del While, en la linea: "+((java_cup.runtime.Symbol)w).right);
+            addError(dosPuntos);
+            RESULT = new Nodo("WHILE",new Nodo[]{whl, dosPuntos,(Nodo) c, (Nodo)pc});
+        :}
+        | WHILE:w error codigoFuncion:c puntoComa:pc
+        {:
+            Nodo whl=new Nodo((String)((java_cup.runtime.Symbol)w).value);
+            Nodo dosPuntos=new Nodo("Error en la definicion del While, en la linea: "+((java_cup.runtime.Symbol)w).right);
+            addError(dosPuntos);
+            RESULT = new Nodo("WHILE",new Nodo[]{whl, dosPuntos,(Nodo)c ,(Nodo)pc});
+        :}
+        
+;
+if ::= IF:w expresionBooleana:eb DOSPUNTOS:dp codigoFuncion:c puntoComa:pc
+        {:
+            Nodo whl=new Nodo((String)((java_cup.runtime.Symbol)w).value);
+            Nodo dosPuntos=new Nodo((String)((java_cup.runtime.Symbol)dp).value);
+            RESULT = new Nodo("IF",new Nodo[]{whl, (Nodo) eb, dosPuntos,(Nodo) c, (Nodo)pc});
+        :}
+        |IF:w expresionBooleana:eb DOSPUNTOS:dp codigoFuncion:c puntoComa:pc elseIf:ei
+        {:
+            Nodo whl=new Nodo((String)((java_cup.runtime.Symbol)w).value);
+            Nodo dosPuntos=new Nodo((String)((java_cup.runtime.Symbol)dp).value);
+            RESULT = new Nodo("IF",new Nodo[]{whl, (Nodo) eb, dosPuntos,(Nodo) c, (Nodo)pc,(Nodo)ei});
+        :}
+        |IF:w error DOSPUNTOS:dp codigoFuncion:c puntoComa:pc
+        {:
+            Nodo whl=new Nodo((String)((java_cup.runtime.Symbol)w).value);
+            Nodo dosPuntos=new Nodo((String)((java_cup.runtime.Symbol)dp).value);
+            addError(new Nodo("Error en la definicion del If, en la linea: "+((java_cup.runtime.Symbol)w).right));
+            RESULT = new Nodo("IF",new Nodo[]{whl, new Nodo("Error en la definicion del If, en la linea: "+((java_cup.runtime.Symbol)w).right), dosPuntos,(Nodo) c, (Nodo)pc});
+        :}
+        |IF:w error DOSPUNTOS:dp codigoFuncion:c puntoComa:pc elseIf:ei
+        {:
+            Nodo whl=new Nodo((String)((java_cup.runtime.Symbol)w).value);
+            Nodo dosPuntos=new Nodo((String)((java_cup.runtime.Symbol)dp).value);
+            addError(new Nodo("Error en la definicion del If, en la linea: "+((java_cup.runtime.Symbol)w).right));
+            RESULT = new Nodo("IF",new Nodo[]{whl, new Nodo("Error en la definicion del If, en la linea: "+((java_cup.runtime.Symbol)w).right),
+                                                 dosPuntos,(Nodo) c, (Nodo)pc,(Nodo)ei});
+        :}
+        |IF:w error puntoComa:pc
+        {:
+            Nodo whl=new Nodo((String)((java_cup.runtime.Symbol)w).value);
+            addError(new Nodo("Error en la definicion del If, en la linea: "+((java_cup.runtime.Symbol)w).right));
+            RESULT = new Nodo("IF",new Nodo[]{whl, new Nodo("Error en la definicion del If, en la linea: "+((java_cup.runtime.Symbol)w).right), 
+                                                (Nodo)pc});
+        :}
+        |IF:w error puntoComa:pc elseIf:ei
+        {:
+            Nodo whl=new Nodo((String)((java_cup.runtime.Symbol)w).value);
+            addError(new Nodo("Error en la definicion del If, en la linea: "+((java_cup.runtime.Symbol)w).right));
+            RESULT = new Nodo("IF",new Nodo[]{whl, new Nodo("Error en la definicion del If, en la linea: "+((java_cup.runtime.Symbol)w).right), 
+                                    (Nodo)pc});
+        :}
+;
+
+elseIf::= ELIF:ei expresionBooleana:eb DOSPUNTOS:dp codigoFuncion:c puntoComa:pc elseIf:ei1
+        {:
+            Nodo whl=new Nodo((String)((java_cup.runtime.Symbol)ei).value);
+            Nodo dosPuntos=new Nodo((String)((java_cup.runtime.Symbol)dp).value);
+            RESULT = new Nodo("ELIF",new Nodo[]{whl, (Nodo) eb, dosPuntos,(Nodo) c, (Nodo)pc,(Nodo)ei1});
+        :}
+        | ELSE:e DOSPUNTOS:dp codigoFuncion:c puntoComa:pc
+        {:
+            Nodo whl=new Nodo((String)((java_cup.runtime.Symbol)e).value);
+            Nodo dosPuntos=new Nodo((String)((java_cup.runtime.Symbol)dp).value);
+            RESULT = new Nodo("ELSE",new Nodo[]{whl, dosPuntos,(Nodo) c, (Nodo)pc});
+        :}
+        | ELIF:ei error DOSPUNTOS:dp codigoFuncion:c puntoComa:pc elseIf:ei1
+        {:
+            Nodo whl=new Nodo((String)((java_cup.runtime.Symbol)ei).value);
+            Nodo dosPuntos=new Nodo((String)((java_cup.runtime.Symbol)dp).value);
+            addError(new Nodo("Error en la definicion del Elif, en la linea: "+((java_cup.runtime.Symbol)ei).right));
+            RESULT = new Nodo("ELIF",new Nodo[]{whl, new Nodo("Error en la definicion del Elif, en la linea: "+((java_cup.runtime.Symbol)ei).right), 
+                        dosPuntos,(Nodo) c, (Nodo)pc,(Nodo)ei1});
+        :}
+        | ELIF:ei error puntoComa:pc elseIf:ei1
+        {:
+            _ultimaLineaDerecha=((java_cup.runtime.Symbol)ei).right;
+            _ultimaLineaIzquierda=((java_cup.runtime.Symbol)ei).left;
+            Nodo whl=new Nodo((String)((java_cup.runtime.Symbol)ei).value);
+            Nodo dosPuntos=new Nodo("Error en la definicion del Elif, en la linea: "+((java_cup.runtime.Symbol)ei).right);
+            addError(dosPuntos);
+            RESULT = new Nodo("ELIF",new Nodo[]{whl, dosPuntos, (Nodo)pc,(Nodo)ei1});
+        :}
+        | ELSE:e DOSPUNTOS:dp codigoFuncion:c puntoComa:pc
+        {:
+            _ultimaLineaDerecha=((java_cup.runtime.Symbol)e).right;
+            _ultimaLineaIzquierda=((java_cup.runtime.Symbol)e).left;
+            Nodo whl=new Nodo((String)((java_cup.runtime.Symbol)e).value);
+            Nodo dosPuntos=new Nodo((String)((java_cup.runtime.Symbol)dp).value);
+            RESULT = new Nodo("ELSE",new Nodo[]{whl, dosPuntos,(Nodo) c, (Nodo)pc});
+        :}
+        | ELSE:e error puntoComa:pc
+        {:
+            _ultimaLineaDerecha=((java_cup.runtime.Symbol)e).right;
+            _ultimaLineaIzquierda=((java_cup.runtime.Symbol)e).left;
+            Nodo whl=new Nodo((String)((java_cup.runtime.Symbol)e).value);
+            Nodo dosPuntos=new Nodo("Error en la definicion del else, en la linea: "+((java_cup.runtime.Symbol)e).right);
+            addError(dosPuntos);
+            RESULT = new Nodo("ELSE",new Nodo[]{whl, dosPuntos, (Nodo)pc});
+        :}
+        | ELIF:ei error DOSPUNTOS:dp codigoFuncion:c puntoComa:pc 
+        {:
+            Nodo whl=new Nodo((String)((java_cup.runtime.Symbol)ei).value);
+            Nodo dosPuntos=new Nodo((String)((java_cup.runtime.Symbol)dp).value);
+            addError(new Nodo("Error en la definicion del Elif, en la linea: "+((java_cup.runtime.Symbol)ei).right));
+            RESULT = new Nodo("ELIF",new Nodo[]{whl, new Nodo("Error en la definicion del Elif, en la linea: "+((java_cup.runtime.Symbol)ei).right), 
+                        dosPuntos,(Nodo) c, (Nodo)pc});
+        :}
+        | ELIF:ei error puntoComa:pc
+        {:
+            _ultimaLineaDerecha=((java_cup.runtime.Symbol)ei).right;
+            _ultimaLineaIzquierda=((java_cup.runtime.Symbol)ei).left;
+            Nodo whl=new Nodo((String)((java_cup.runtime.Symbol)ei).value);
+            Nodo dosPuntos=new Nodo("Error en la definicion del Elif, en la linea: "+((java_cup.runtime.Symbol)ei).right);
+            addError(dosPuntos);
+            RESULT = new Nodo("ELIF",new Nodo[]{whl, dosPuntos, (Nodo)pc});
+        :}
+        |ELIF:ei expresionBooleana:eb DOSPUNTOS:dp codigoFuncion:c puntoComa:pc
+        {:
+            Nodo whl=new Nodo((String)((java_cup.runtime.Symbol)ei).value);
+            Nodo dosPuntos=new Nodo((String)((java_cup.runtime.Symbol)dp).value);
+            RESULT = new Nodo("ELIF",new Nodo[]{whl, (Nodo) eb, dosPuntos,(Nodo) c, (Nodo)pc});
+        :}
+;
+
+expresionBooleana ::= 
+                    expresion:o IGUALCOMP:m expresion:ca
+                    {:
+                        Nodo n=new Nodo((String)((java_cup.runtime.Symbol)m).value);
+                        RESULT = new Nodo("Contenido", new Nodo[]{(Nodo)o,n,(Nodo)ca});
+                    :}
+                    |
+                    expresion:o AND:m expresion:ca
+                    {:
+                        Nodo n=new Nodo((String)((java_cup.runtime.Symbol)m).value);
+                        RESULT = new Nodo("Contenido", new Nodo[]{(Nodo)o,n,(Nodo)ca});
+                    :}
+                    |
+                    expresion:o OR:m expresion:ca
+                    {:
+                        Nodo n=new Nodo((String)((java_cup.runtime.Symbol)m).value);
+                        RESULT = new Nodo("Contenido", new Nodo[]{(Nodo)o,n,(Nodo)ca});
+                    :}
+                    |
+                    expresion:o NOT:m expresion:ca
+                    {:
+                        Nodo n=new Nodo((String)((java_cup.runtime.Symbol)m).value);
+                        RESULT = new Nodo("Contenido", new Nodo[]{(Nodo)o,n,(Nodo)ca});
+                    :}
+                    |
+                    expresion:o DIFERENTE:m expresion:ca
+                    {:
+                        Nodo n=new Nodo((String)((java_cup.runtime.Symbol)m).value);
+                        RESULT = new Nodo("Contenido", new Nodo[]{(Nodo)o,n,(Nodo)ca});
+                    :}
+                    |
+                    expresion:o DISTINTO:m expresion:ca
+                    {:
+                        Nodo n=new Nodo((String)((java_cup.runtime.Symbol)m).value);
+                        RESULT = new Nodo("Contenido", new Nodo[]{(Nodo)o,n,(Nodo)ca});
+                    :}
+                    |
+                    expresion:o MAYORIGUAL:m expresion:ca
+                    {:
+                        Nodo n=new Nodo((String)((java_cup.runtime.Symbol)m).value);
+                        RESULT = new Nodo("Contenido", new Nodo[]{(Nodo)o,n,(Nodo)ca});
+                    :}
+                    |
+                    expresion:o MENORIGUAL:m expresion:ca
+                    {:
+                        Nodo n=new Nodo((String)((java_cup.runtime.Symbol)m).value);
+                        RESULT = new Nodo("Contenido", new Nodo[]{(Nodo)o,n,(Nodo)ca});
+                    :}
+                    |
+                    expresion:o MAYOR:m expresion:ca
+                    {:
+                        Nodo n=new Nodo((String)((java_cup.runtime.Symbol)m).value);
+                        RESULT = new Nodo("Contenido", new Nodo[]{(Nodo)o,n,(Nodo)ca});
+                    :}
+                    |
+                    expresion:o MENOR:m expresion:ca
+                    {:
+                        Nodo n=new Nodo((String)((java_cup.runtime.Symbol)m).value);
+                        RESULT = new Nodo("Contenido", new Nodo[]{(Nodo)o,n,(Nodo)ca});
+                    :}
+                    |
+                    PARENTESISIZQ:pi expresion:ca PARENTESISDER:pd
+                    {:
+                        Nodo n=new Nodo((String)((java_cup.runtime.Symbol)pi).value);
+                        Nodo n1=new Nodo((String)((java_cup.runtime.Symbol)pd).value);
+                        RESULT = new Nodo("Contenido", new Nodo[]{n, (Nodo)ca, n1});
+                    :}
+                    | objeto:o
+                    {:
+                        RESULT = new Nodo("Contenido", new Nodo[]{(Nodo)o});
+                    :}
+;
+asignacion::= 
+                    ID:i opAsig:op expresion:ca
+                    {:
+                        Nodo n=new Nodo((String)((java_cup.runtime.Symbol)i).value);
+                        RESULT = new Nodo("ASIGNACION", new Nodo[]{n,(Nodo)op,(Nodo)ca});
+                    :}
+                    |variableIndexada:i opAsig:op expresion:ca
+                    {:
+                        RESULT = new Nodo("ASIGNACION", new Nodo[]{(Nodo)i,(Nodo)op,(Nodo)ca});
+                    :}
+                    |
+                    expresion opAsig error
+                    {:
+                        addError(new Nodo("Error en la asignacion, en la línea: "+_ultimaLineaDerecha));
+                        RESULT = new Nodo("Error en la asignacion, en la línea: "+_ultimaLineaDerecha);
+                    :}
+                    |
+                    error opAsig expresion
+                    {:
+                        addError(new Nodo("Error en la asignacion, en la línea: "+_ultimaLineaIzquierda));
+                        RESULT = new Nodo("Error en la asignacion, en la línea: "+_ultimaLineaIzquierda);
+                    :}
+                    |
+                    error opAsig error
+                    {:
+                        addError(new Nodo("Error en la asignacion, en la línea: "+_ultimaLineaDerecha));
+                        RESULT = new Nodo("Error en la asignacion,  en la línea: "+_ultimaLineaDerecha);
+                    :}
+;
+
+opAsig::= ASIGNACION:a 
+                    {:
+                        _ultimaLineaDerecha=((java_cup.runtime.Symbol)a).right;
+                        _ultimaLineaIzquierda=((java_cup.runtime.Symbol)a).left;
+                        Nodo n=new Nodo((String)((java_cup.runtime.Symbol)a).value);
+                        RESULT = new Nodo("OPERADOR", new Nodo[]{n});
+                    :}
+        | MASIGUAL:mi 
+                    {:
+                        _ultimaLineaDerecha=((java_cup.runtime.Symbol)mi).right;
+                        _ultimaLineaIzquierda=((java_cup.runtime.Symbol)mi).left;
+                        Nodo n=new Nodo((String)((java_cup.runtime.Symbol)mi).value);
+                        RESULT = new Nodo("OPERADOR", new Nodo[]{n});
+                    :}
+        | MENOSIGUAL:mi 
+                    {:
+                        _ultimaLineaDerecha=((java_cup.runtime.Symbol)mi).right;
+                        _ultimaLineaIzquierda=((java_cup.runtime.Symbol)mi).left;
+                        Nodo n=new Nodo((String)((java_cup.runtime.Symbol)mi).value);
+                        RESULT = new Nodo("OPERADOR", new Nodo[]{n});
+                    :}
+        | MULTIGUAL:mi 
+                    {:
+                        _ultimaLineaDerecha=((java_cup.runtime.Symbol)mi).right;
+                        _ultimaLineaIzquierda=((java_cup.runtime.Symbol)mi).left;
+                        Nodo n=new Nodo((String)((java_cup.runtime.Symbol)mi).value);
+                        RESULT = new Nodo("OPERADOR", new Nodo[]{n});
+                    :}
+        | DIVIGUAL:di 
+                    {:
+                        _ultimaLineaDerecha=((java_cup.runtime.Symbol)di).right;
+                        _ultimaLineaIzquierda=((java_cup.runtime.Symbol)di).left;
+                        Nodo n=new Nodo((String)((java_cup.runtime.Symbol)di).value);
+                        RESULT = new Nodo("OPERADOR", new Nodo[]{n});
+                    :}
+        | POTIGUAL:pi
+                    {:
+                        _ultimaLineaDerecha=((java_cup.runtime.Symbol)pi).right;
+                        _ultimaLineaIzquierda=((java_cup.runtime.Symbol)pi).left;
+                        Nodo n=new Nodo((String)((java_cup.runtime.Symbol)pi).value);
+                        RESULT = new Nodo("OPERADOR", new Nodo[]{n});
+                    :}
+        | DIVENTIGUAL:dei
+                    {:
+                        _ultimaLineaDerecha=((java_cup.runtime.Symbol)dei).right;
+                        _ultimaLineaIzquierda=((java_cup.runtime.Symbol)dei).left;
+                        Nodo n=new Nodo((String)((java_cup.runtime.Symbol)dei).value);
+                        RESULT = new Nodo("OPERADOR", new Nodo[]{n});
+                    :}
+        | MODIGUAL:mi
+                    {:
+                        _ultimaLineaDerecha=((java_cup.runtime.Symbol)mi).right;
+                        _ultimaLineaIzquierda=((java_cup.runtime.Symbol)mi).left;
+                        Nodo n=new Nodo((String)((java_cup.runtime.Symbol)mi).value);
+                        RESULT = new Nodo("OPERADOR", new Nodo[]{n});
+                    :}
+;
+expresion::=        expresion:o MAS:m expresion:ca
+                    {:
+                        Nodo n=new Nodo((String)((java_cup.runtime.Symbol)m).value);
+                        RESULT = new Nodo("Contenido", new Nodo[]{(Nodo)o,n,(Nodo)ca});
+                    :}
+                    |
+                    expresion:o MENOS:m expresion:ca
+                    {:
+                        Nodo n=new Nodo((String)((java_cup.runtime.Symbol)m).value);
+                        RESULT = new Nodo("Contenido", new Nodo[]{(Nodo)o,n,(Nodo)ca});
+                    :}
+                    |
+                    expresion:o MULT:m expresion:ca
+                    {:
+                        Nodo n=new Nodo((String)((java_cup.runtime.Symbol)m).value);
+                        RESULT = new Nodo("Contenido", new Nodo[]{(Nodo)o,n,(Nodo)ca});
+                    :}
+                    |
+                    expresion:o DIV:m expresion:ca
+                    {:
+                        Nodo n=new Nodo((String)((java_cup.runtime.Symbol)m).value);
+                        RESULT = new Nodo("Contenido", new Nodo[]{(Nodo)o,n,(Nodo)ca});
+                    :}
+                    |
+                    expresion:o DIVENT:m expresion:ca
+                    {:
+                        Nodo n=new Nodo((String)((java_cup.runtime.Symbol)m).value);
+                        RESULT = new Nodo("Contenido", new Nodo[]{(Nodo)o,n,(Nodo)ca});
+                    :}
+                    |
+                    expresion:o MOD:m expresion:ca
+                    {:
+                        Nodo n=new Nodo((String)((java_cup.runtime.Symbol)m).value);
+                        RESULT = new Nodo("Contenido", new Nodo[]{(Nodo)o,n,(Nodo)ca});
+                    :}
+                    |
+                    expresion:o POTENCIA:m expresion:ca
+                    {:
+                        Nodo n=new Nodo((String)((java_cup.runtime.Symbol)m).value);
+                        RESULT = new Nodo("Contenido", new Nodo[]{(Nodo)o,n,(Nodo)ca});
+                    :}
+                    |
+                    expresion:o IGUALCOMP:m expresion:ca
+                    {:
+                        Nodo n=new Nodo((String)((java_cup.runtime.Symbol)m).value);
+                        RESULT = new Nodo("Contenido", new Nodo[]{(Nodo)o,n,(Nodo)ca});
+                    :}
+                    |
+                    expresion:o DIFERENTE:m expresion:ca
+                    {:
+                        Nodo n=new Nodo((String)((java_cup.runtime.Symbol)m).value);
+                        RESULT = new Nodo("Contenido", new Nodo[]{(Nodo)o,n,(Nodo)ca});
+                    :}
+                    |
+                    expresion:o DISTINTO:m expresion:ca
+                    {:
+                        Nodo n=new Nodo((String)((java_cup.runtime.Symbol)m).value);
+                        RESULT = new Nodo("Contenido", new Nodo[]{(Nodo)o,n,(Nodo)ca});
+                    :}
+                    |
+                    expresion:o MAYORIGUAL:m expresion:ca
+                    {:
+                        Nodo n=new Nodo((String)((java_cup.runtime.Symbol)m).value);
+                        RESULT = new Nodo("Contenido", new Nodo[]{(Nodo)o,n,(Nodo)ca});
+                    :}
+                    |
+                    expresion:o MENORIGUAL:m expresion:ca
+                    {:
+                        Nodo n=new Nodo((String)((java_cup.runtime.Symbol)m).value);
+                        RESULT = new Nodo("Contenido", new Nodo[]{(Nodo)o,n,(Nodo)ca});
+                    :}
+                    |
+                    expresion:o SHL:m expresion:ca
+                    {:
+                        Nodo n=new Nodo((String)((java_cup.runtime.Symbol)m).value);
+                        RESULT = new Nodo("Contenido", new Nodo[]{(Nodo)o,n,(Nodo)ca});
+                    :}
+                    |
+                    expresion:o SHR:m expresion:ca
+                    {:
+                        Nodo n=new Nodo((String)((java_cup.runtime.Symbol)m).value);
+                        RESULT = new Nodo("Contenido", new Nodo[]{(Nodo)o,n,(Nodo)ca});
+                    :}
+                    |
+                    expresion:o BITAND:m expresion:ca
+                    {:
+                        Nodo n=new Nodo((String)((java_cup.runtime.Symbol)m).value);
+                        RESULT = new Nodo("Contenido", new Nodo[]{(Nodo)o,n,(Nodo)ca});
+                    :}
+                    |
+                    expresion:o BITOR:m expresion:ca
+                    {:
+                        Nodo n=new Nodo((String)((java_cup.runtime.Symbol)m).value);
+                        RESULT = new Nodo("Contenido", new Nodo[]{(Nodo)o,n,(Nodo)ca});
+                    :}
+                    |
+                    expresion:o BITXOR:m expresion:ca
+                    {:
+                        Nodo n=new Nodo((String)((java_cup.runtime.Symbol)m).value);
+                        RESULT = new Nodo("Contenido", new Nodo[]{(Nodo)o,n,(Nodo)ca});
+                    :}
+                    |
+                    expresion:o BITNOT:m expresion:ca
+                    {:
+                        Nodo n=new Nodo((String)((java_cup.runtime.Symbol)m).value);
+                        RESULT = new Nodo("Contenido", new Nodo[]{(Nodo)o,n,(Nodo)ca});
+                    :}
+                    |
+                    expresion:o MAYOR:m expresion:ca
+                    {:
+                        Nodo n=new Nodo((String)((java_cup.runtime.Symbol)m).value);
+                        RESULT = new Nodo("Contenido", new Nodo[]{(Nodo)o,n,(Nodo)ca});
+                    :}
+                    |
+                    expresion:o MENOR:m expresion:ca
+                    {:
+                        Nodo n=new Nodo((String)((java_cup.runtime.Symbol)m).value);
+                        RESULT = new Nodo("Contenido", new Nodo[]{(Nodo)o,n,(Nodo)ca});
+                    :}
+                    |
+                    PARENTESISIZQ:pi expresion:ca PARENTESISDER:pd
+                    {:
+                        Nodo n=new Nodo((String)((java_cup.runtime.Symbol)pi).value);
+                        Nodo n1=new Nodo((String)((java_cup.runtime.Symbol)pd).value);
+                        RESULT = new Nodo("Contenido", new Nodo[]{n, (Nodo)ca, n1});
+                    :}
+                    | objeto:o
+                    {:
+                        RESULT = new Nodo("Contenido", new Nodo[]{(Nodo)o});
+                    :}
+                    | error:e
+                    {:
+                    addError(new Nodo("Error en la expresion, en la línea: "+_ultimaLineaDerecha));
+                        RESULT = new Nodo("Error en la expresion, en la línea: "+_ultimaLineaDerecha);
+                    :}
+;
+objeto::=   asignacion:a 
+            {:
+                RESULT = new Nodo("CODIGO", new Nodo[]{(Nodo)a});
+            :}
+            |   ID:i
+            {:
+                _ultimaLineaDerecha=((java_cup.runtime.Symbol)i).right;
+                _ultimaLineaIzquierda=((java_cup.runtime.Symbol)i).left;
+                Nodo n=new Nodo((String)((java_cup.runtime.Symbol)i).value);
+                RESULT = new Nodo("OBJETO", new Nodo[]{n});
+            :}
+            | LITERALINT:li
+            {:
+                _ultimaLineaDerecha=((java_cup.runtime.Symbol)li).right;
+                _ultimaLineaIzquierda=((java_cup.runtime.Symbol)li).left;
+                Nodo n=new Nodo((String)((java_cup.runtime.Symbol)li).value);
+                RESULT = new Nodo("OBJETO", new Nodo[]{n});
+            :}
+            | LITERALFLOAT:lf
+            {:
+                _ultimaLineaDerecha=((java_cup.runtime.Symbol)lf).right;
+                _ultimaLineaIzquierda=((java_cup.runtime.Symbol)lf).left;
+                Nodo n=new Nodo((String)((java_cup.runtime.Symbol)lf).value);
+                RESULT = new Nodo("OBJETO", new Nodo[]{n});
+            :}
+            | LITERALSTRING:ls
+            {:
+                _ultimaLineaDerecha=((java_cup.runtime.Symbol)ls).right;
+                _ultimaLineaIzquierda=((java_cup.runtime.Symbol)ls).left;
+                Nodo n=new Nodo((String)((java_cup.runtime.Symbol)ls).value);
+                RESULT = new Nodo("OBJETO", new Nodo[]{n});
+            :}
+            | LITERALCHAR:lc 
+            {:
+                _ultimaLineaDerecha=((java_cup.runtime.Symbol)lc).right;
+                _ultimaLineaIzquierda=((java_cup.runtime.Symbol)lc).left;
+                Nodo n=new Nodo((String)((java_cup.runtime.Symbol)lc).value);
+                RESULT = new Nodo("OBJETO", new Nodo[]{n});
+            :}
+            | LITERALFALSE:lf
+            {:
+                _ultimaLineaDerecha=((java_cup.runtime.Symbol)lf).right;
+                _ultimaLineaIzquierda=((java_cup.runtime.Symbol)lf).left;
+                Nodo n=new Nodo((String)((java_cup.runtime.Symbol)lf).value);
+                RESULT = new Nodo("OBJETO", new Nodo[]{n});
+            :}
+            | LITERALTRUE:lt
+            {:
+                _ultimaLineaDerecha=((java_cup.runtime.Symbol)lt).right;
+                _ultimaLineaIzquierda=((java_cup.runtime.Symbol)lt).left;
+                Nodo n=new Nodo((String)((java_cup.runtime.Symbol)lt).value);
+                RESULT = new Nodo("OBJETO", new Nodo[]{n});
+            :}
+            | lista:l
+            {:
+                RESULT = new Nodo("OBJETO", new Nodo[]{(Nodo)l});
+            :}
+            | llamadoFuncion:llf
+            {:
+                RESULT = new Nodo("OBJETO", new Nodo[]{(Nodo)llf});
+            :}
+            | variableIndexada:vi
+            {:
+                RESULT = new Nodo("OBJETO", new Nodo[]{(Nodo)vi});
+            :}
+;
+lista::=CORCHETEIZQ:ci argumentosLista:al CORCHETEDER:cd
+        {:
+            Nodo corI = new Nodo((String)((java_cup.runtime.Symbol)ci).value);
+            Nodo corD=new Nodo((String)((java_cup.runtime.Symbol)cd).value);
+            RESULT= new Nodo("DEFINICION DE UNA LISTA",new Nodo[]{corI,(Nodo)al,corD});
+        :}
+;
+
+argumentosLista::= elementoLista:el
+        {:
+            RESULT= new Nodo("Argumentos de lista",new Nodo[]{(Nodo)el});
+        :}
+        | elementoLista:el COMA:c argumentosLista:al
+        {:
+            Nodo coma=new Nodo((String)((java_cup.runtime.Symbol)c).value);
+            RESULT= new Nodo("Argumentos de lista",new Nodo[]{(Nodo)el,coma,(Nodo)al});
+        :}
+        |
+        {:
+            RESULT= new Nodo("Argumentos de lista");
+        :}
+;
+
+elementoLista::= expresion:i
+        {:
+            RESULT= new Nodo("Elemento de lista",new Nodo[]{(Nodo)i});
+        :}
+;
+
+variableIndexada::= ID:i corcheteIndexado:ci
+        {:
+            Nodo id=new Nodo((String)((java_cup.runtime.Symbol)i).value);
+            RESULT= new Nodo("Variable con indice de una lista",new Nodo[]{id,(Nodo)ci});
+        :}
+        |ID:i error corcheteAux
+        {:
+            addError(new Nodo("Error en la indexacion, en la línea: "+((java_cup.runtime.Symbol)i).right));
+            RESULT= new Nodo("Error en la indexacion, en la línea: "+((java_cup.runtime.Symbol)i).right);
+        :}
+;
+
+corcheteIndexado ::=  CORCHETEIZQ:ci formaLista:fl CORCHETEDER:cd corcheteAux:ca
+        {:
+            Nodo corI=new Nodo((String)((java_cup.runtime.Symbol)ci).value);
+            Nodo corD=new Nodo((String)((java_cup.runtime.Symbol)cd).value);
+            RESULT= new Nodo("Indice de la variable",new Nodo[]{corI,(Nodo)fl,corD,(Nodo)ca});
+        :}
+;
+corcheteAux ::= corcheteIndexado:ca
+        {:
+            RESULT= new Nodo("Indice de la variable",new Nodo[]{(Nodo)ca});
+        :}
+        | 
+        {:
+            RESULT= new Nodo();
+        :}
+;
+formaLista ::= expresion:al 
+        {:
+            RESULT= new Nodo("Valor indice",new Nodo[]{(Nodo)al});
+        :}
+        | DOSPUNTOS:dp expresion:al
+        {:
+            Nodo dosp=new Nodo((String)((java_cup.runtime.Symbol)dp).value);
+            RESULT= new Nodo("Valor indice",new Nodo[]{dosp,(Nodo)al});
+        :}
+        | expresion:al DOSPUNTOS:dp
+        {:
+            Nodo dosp=new Nodo((String)((java_cup.runtime.Symbol)dp).value);
+            RESULT= new Nodo("Valor indice",new Nodo[]{(Nodo)al,dosp});
+        :}
+        | expresion:al DOSPUNTOS:dp expresion:al2
+        {:
+            Nodo dosp=new Nodo((String)((java_cup.runtime.Symbol)dp).value);
+            RESULT= new Nodo("Valor indice",new Nodo[]{(Nodo)al,dosp, (Nodo)al2});
+        :}
+        | DOSPUNTOS:dp
+        {:
+            Nodo dosp=new Nodo((String)((java_cup.runtime.Symbol)dp).value);
+            RESULT= new Nodo("Valor indice",new Nodo[]{dosp});
+        :}
+;
+
+llamadoFuncion::= ID:i PARENTESISIZQ:pi argumentosFuncion:af 
+        {:
+            _ultimaLineaDerecha=((java_cup.runtime.Symbol)i).right;
+            _ultimaLineaIzquierda=((java_cup.runtime.Symbol)i).left;
+            Nodo id=new Nodo((String)((java_cup.runtime.Symbol)i).value);
+            Nodo parI=new Nodo((String)((java_cup.runtime.Symbol)pi).value);
+            RESULT= new Nodo("FUNCION",new Nodo[]{id,parI,(Nodo)af});
+        :}
+        |
+        ID:i PARENTESISIZQ:pi PARENTESISDER:pd
+        {:
+            _ultimaLineaDerecha=((java_cup.runtime.Symbol)i).right;
+            _ultimaLineaIzquierda=((java_cup.runtime.Symbol)i).left;
+            Nodo id=new Nodo((String)((java_cup.runtime.Symbol)i).value);
+            Nodo parI=new Nodo((String)((java_cup.runtime.Symbol)pi).value);
+            Nodo parD=new Nodo((String)((java_cup.runtime.Symbol)pd).value);
+            RESULT= new Nodo("FUNCION.",new Nodo[]{id,parI,parD});
+        :}
+        |PRINT:i PARENTESISIZQ:pi argumentosFuncion:af
+        {:
+            _ultimaLineaDerecha=((java_cup.runtime.Symbol)i).right;
+            _ultimaLineaIzquierda=((java_cup.runtime.Symbol)i).left;
+            Nodo id=new Nodo((String)((java_cup.runtime.Symbol)i).value);
+            Nodo parI=new Nodo((String)((java_cup.runtime.Symbol)pi).value);
+            RESULT= new Nodo("FUNCION",new Nodo[]{id,parI,(Nodo)af});
+        :}
+        |
+        PRINT:i PARENTESISIZQ:pi PARENTESISDER:pd
+        {:
+            _ultimaLineaDerecha=((java_cup.runtime.Symbol)i).right;
+            _ultimaLineaIzquierda=((java_cup.runtime.Symbol)i).left;
+            /*Nodo parI=new Nodo((String)((java_cup.runtime.Symbol)pi).value);
+            Nodo parD=new Nodo((String)((java_cup.runtime.Symbol)pd).value);*/
+            addError(new Nodo("Error: Print vacio,en la línea: "+((java_cup.runtime.Symbol)i).right));
+            RESULT= new Nodo("Error: Print vacio,en la línea: "+((java_cup.runtime.Symbol)i).right);
+        :}
+        |tipo:i PARENTESISIZQ:pi argumentosFuncion:af
+        {:
+            _ultimaLineaDerecha=((java_cup.runtime.Symbol)i).right;
+            _ultimaLineaIzquierda=((java_cup.runtime.Symbol)i).left;
+            Nodo parI=new Nodo((String)((java_cup.runtime.Symbol)pi).value);
+            RESULT= new Nodo("FUNCION",new Nodo[]{(Nodo) i, parI,(Nodo)af});
+        :}
+        |
+        tipo:i PARENTESISIZQ:pi PARENTESISDER:pd
+        {:
+            _ultimaLineaDerecha=((java_cup.runtime.Symbol)i).right;
+            _ultimaLineaIzquierda=((java_cup.runtime.Symbol)i).left;
+            Nodo parI=new Nodo((String)((java_cup.runtime.Symbol)pi).value);
+            Nodo parD=new Nodo((String)((java_cup.runtime.Symbol)pd).value);
+            RESULT= new Nodo("FUNCION.",new Nodo[]{(Nodo) i, parI,parD});
+        :}
+        |INPUT:i PARENTESISIZQ:pi argumentosFuncion:af
+        {:
+            _ultimaLineaDerecha=((java_cup.runtime.Symbol)i).right;
+            _ultimaLineaIzquierda=((java_cup.runtime.Symbol)i).left;
+            Nodo id=new Nodo((String)((java_cup.runtime.Symbol)i).value);
+            Nodo parI=new Nodo((String)((java_cup.runtime.Symbol)pi).value);
+            RESULT= new Nodo("FUNCION",new Nodo[]{id,parI,(Nodo)af});
+        :}
+        |
+        INPUT:i PARENTESISIZQ:pi PARENTESISDER:pd
+        {:
+            _ultimaLineaDerecha=((java_cup.runtime.Symbol)i).right;
+            _ultimaLineaIzquierda=((java_cup.runtime.Symbol)i).left;
+            Nodo id=new Nodo((String)((java_cup.runtime.Symbol)i).value);
+            Nodo parI=new Nodo((String)((java_cup.runtime.Symbol)pi).value);
+            Nodo parD=new Nodo((String)((java_cup.runtime.Symbol)pd).value);
+            RESULT= new Nodo("FUNCION.",new Nodo[]{id,parI,parD});
+        :}
+        |LITERALSTRING:ls PUNTO:p ID:i PARENTESISIZQ:pi argumentosFuncion:af 
+        {:
+            _ultimaLineaDerecha=((java_cup.runtime.Symbol)i).right;
+            _ultimaLineaIzquierda=((java_cup.runtime.Symbol)i).left;
+            Nodo str= new Nodo((String)((java_cup.runtime.Symbol)ls).value);
+            Nodo pu= new Nodo((String)((java_cup.runtime.Symbol)p).value);
+            Nodo id= new Nodo((String)((java_cup.runtime.Symbol)i).value);
+            Nodo piz= new Nodo((String)((java_cup.runtime.Symbol)pi).value);
+            RESULT= new Nodo("FUNCION",new Nodo[]{str,pu,id,piz,(Nodo)af});
+        :}
+        |LITERALSTRING:ls PUNTO:p ID:i PARENTESISIZQ:pi PARENTESISDER:pd
+        {:
+            _ultimaLineaDerecha=((java_cup.runtime.Symbol)i).right;
+            _ultimaLineaIzquierda=((java_cup.runtime.Symbol)i).left;
+            Nodo str= new Nodo((String)((java_cup.runtime.Symbol)ls).value);
+            Nodo pu= new Nodo((String)((java_cup.runtime.Symbol)p).value);
+            Nodo id= new Nodo((String)((java_cup.runtime.Symbol)i).value);
+            Nodo piz= new Nodo((String)((java_cup.runtime.Symbol)pi).value);
+            Nodo pder= new Nodo((String)((java_cup.runtime.Symbol)pd).value);
+            RESULT= new Nodo("FUNCION",new Nodo[]{str,pu,id,piz,pder});
+        :}
+        |ID:i1 PUNTO:p ID:i PARENTESISIZQ:pi argumentosFuncion:af
+        {:
+            _ultimaLineaDerecha=((java_cup.runtime.Symbol)i).right;
+            _ultimaLineaIzquierda=((java_cup.runtime.Symbol)i).left;
+            Nodo id1= new Nodo((String)((java_cup.runtime.Symbol)i).value);
+            Nodo pu= new Nodo((String)((java_cup.runtime.Symbol)p).value);
+            Nodo id= new Nodo((String)((java_cup.runtime.Symbol)i).value);
+            Nodo piz= new Nodo((String)((java_cup.runtime.Symbol)pi).value);
+            RESULT= new Nodo("FUNCION",new Nodo[]{id1,pu,id,piz,(Nodo)af});
+        :}
+        |ID:i1 PUNTO:p ID:i PARENTESISIZQ:pi PARENTESISDER:pd
+        {:
+            _ultimaLineaDerecha=((java_cup.runtime.Symbol)i).right;
+            _ultimaLineaIzquierda=((java_cup.runtime.Symbol)i).left;
+            Nodo id1= new Nodo((String)((java_cup.runtime.Symbol)i1).value);
+            Nodo pu= new Nodo((String)((java_cup.runtime.Symbol)p).value);
+            Nodo id= new Nodo((String)((java_cup.runtime.Symbol)i).value);
+            Nodo piz= new Nodo((String)((java_cup.runtime.Symbol)pi).value);
+            Nodo pder= new Nodo((String)((java_cup.runtime.Symbol)pd).value);
+            RESULT= new Nodo("FUNCION",new Nodo[]{id1,pu,id,piz,pder});
+        :}        
+;
+
+argumentosFuncion::= expresion:oa PARENTESISDER:pd
+        {:
+            Nodo parD=new Nodo((String)((java_cup.runtime.Symbol)pd).value);
+            RESULT= new Nodo("ARGUMENTO",new Nodo[]{(Nodo)oa, parD});
+        :}
+        | expresion:oa COMA:c argumentosFuncion:af
+        {:
+            Nodo coma=new Nodo((String)((java_cup.runtime.Symbol)c).value);
+            RESULT= new Nodo("ARGUMENTO",new Nodo[]{(Nodo)oa,coma,(Nodo)af});
+        :}
+        | error
+        {:
+            addError(new Nodo("Error en los argumentos de la funcion, en la línea: "+_ultimaLineaDerecha));
+            RESULT= new Nodo("Error en los argumentos de la funcion, en la línea: "+_ultimaLineaDerecha);
+        :}
+;
+funcDef ::= 
+            DEF:d ID:i parametros:p DOSPUNTOS:dp variablesLocales:dv codigoFuncion:cf puntoComa:pc
+            {:        
+                Nodo def=new Nodo((String)((java_cup.runtime.Symbol)d).value);
+                Nodo id= new Nodo((String)((java_cup.runtime.Symbol)i).value);
+                Nodo dosP=new Nodo((String)((java_cup.runtime.Symbol)dp).value);
+                RESULT = new Nodo("FUNCDEF", new Nodo[]{(Nodo)def, id, (Nodo) p, dosP,(Nodo) dv, (Nodo)cf, (Nodo)pc});
+            :}
+            | DEF:d error DOSPUNTOS:dp variablesLocales:dv codigoFuncion:cf puntoComa:pc
+            {:        
+                Nodo def=new Nodo((String)((java_cup.runtime.Symbol)d).value);
+                Nodo id= new Nodo("Error en la declaracion de la función, en la línea:"+((java_cup.runtime.Symbol)d).right);
+                addError(id);
+                Nodo dosP=new Nodo((String)((java_cup.runtime.Symbol)dp).value);
+                RESULT = new Nodo("FUNCDEF", new Nodo[]{(Nodo)def, id, dosP,(Nodo) dv, (Nodo)cf, (Nodo)pc});
+            :}
+            | DEF:d DOSPUNTOS:dp puntoComa:pc
+            {:        
+                Nodo def=new Nodo((String)((java_cup.runtime.Symbol)d).value);
+                Nodo id= new Nodo("Error en la declaracion de la función, en la línea: "+((java_cup.runtime.Symbol)d).right);
+                addError(id);
+                Nodo dosP=new Nodo((String)((java_cup.runtime.Symbol)dp).value);
+                RESULT = new Nodo("FUNCDEF", new Nodo[]{(Nodo)def, dosP, (Nodo)pc});
+            :}
+            | DEF:d error puntoComa:pc
+            {:
+                Nodo def=new Nodo((String)((java_cup.runtime.Symbol)d).value);
+                Nodo id= new Nodo("Error en la declaracion de la función, en la línea:"+((java_cup.runtime.Symbol)d).right);
+                addError(id);
+                RESULT = new Nodo("FUNCDEF", new Nodo[]{(Nodo)def, id, (Nodo)pc});
+            :}
+            | DEF:d DOSPUNTOS:puntocoma
+            {:
+                _ultimaLineaDerecha=((java_cup.runtime.Symbol)puntocoma).right;
+                _ultimaLineaIzquierda=((java_cup.runtime.Symbol)puntocoma).left;
+                Nodo def=new Nodo((String)((java_cup.runtime.Symbol)d).value);
+                Nodo id= new Nodo("Error en la declaracion de la función, en la linea: "+((java_cup.runtime.Symbol)d).right);
+                addError(id);
+                Nodo pc=new Nodo((String)((java_cup.runtime.Symbol)puntocoma).value);
+                RESULT = new Nodo("FUNCDEF", new Nodo[]{(Nodo)def, id, pc});
+            :}
+            | DEF:d error
+            {:
+                _ultimaLineaDerecha=((java_cup.runtime.Symbol)d).right;
+                _ultimaLineaIzquierda=((java_cup.runtime.Symbol)d).left;
+                Nodo def=new Nodo((String)((java_cup.runtime.Symbol)d).value);
+                addError(new Nodo("Error en la definicion de la funcion, en la línea:"+((java_cup.runtime.Symbol)d).right));
+                RESULT = new Nodo("Error en la definicion de la funcion, en la línea:"+((java_cup.runtime.Symbol)d).right, 
+                                    new Nodo[]{(Nodo)def});
+            :}
+;
+
+parametros  ::= PARENTESISIZQ:pi listaArg:la PARENTESISDER:pd
+            {:
+                Nodo pizq=new Nodo((String)((java_cup.runtime.Symbol)pi).value);
+                Nodo pder=new Nodo((String)((java_cup.runtime.Symbol)pd).value);
+                RESULT = new Nodo("PARAMETROS", new Nodo[] {pizq, (Nodo) la, pder});
+            :}
+            |
+            PARENTESISIZQ:pi PARENTESISDER:pd
+            {:
+                Nodo pizq=new Nodo((String)((java_cup.runtime.Symbol)pi).value);
+                Nodo pder=new Nodo((String)((java_cup.runtime.Symbol)pd).value);
+                RESULT = new Nodo("PARAMETROS", new Nodo[] {pizq, pder});
+            :}
+;
+
+listaArg ::= tipo:t ID:i 
+            {:
+                Nodo id= new Nodo((String)((java_cup.runtime.Symbol)i).value);
+                RESULT = new Nodo("LISTARG",new Nodo[] {(Nodo)t, id});
+            :}
+            | tipo:t ID:i COMA:c listaArg:la
+            {:
+                Nodo id= new Nodo((String)((java_cup.runtime.Symbol)i).value);
+                Nodo coma = new Nodo((String)((java_cup.runtime.Symbol)c).value);
+                RESULT = new Nodo("LISTAARG",new Nodo[] {(Nodo)t, id,coma, (Nodo)la});
+            :}
+;
+tipo ::= INT:i 
+            {:
+                _ultimaLineaDerecha=((java_cup.runtime.Symbol)i).right;
+                _ultimaLineaIzquierda=((java_cup.runtime.Symbol)i).left;
+                Nodo nodo= new Nodo((String)((java_cup.runtime.Symbol)i).value);
+                RESULT = new Nodo("TIPO",new Nodo[]{nodo});
+            :}
+        | LIST:l 
+            {:
+                _ultimaLineaDerecha=((java_cup.runtime.Symbol)l).right;
+                _ultimaLineaIzquierda=((java_cup.runtime.Symbol)l).left;
+                Nodo nodo= new Nodo((String)((java_cup.runtime.Symbol)l).value);
+                RESULT = new Nodo("TIPO",new Nodo[]{nodo});
+            :}
+        | FLOAT:f 
+            {:
+                _ultimaLineaDerecha=((java_cup.runtime.Symbol)f).right;
+                _ultimaLineaIzquierda=((java_cup.runtime.Symbol)f).left;
+                Nodo nodo= new Nodo((String)((java_cup.runtime.Symbol)f).value);
+                RESULT = new Nodo("TIPO",new Nodo[]{nodo});
+            :}
+        | STRING:s 
+            {:
+                _ultimaLineaDerecha=((java_cup.runtime.Symbol)s).right;
+                _ultimaLineaIzquierda=((java_cup.runtime.Symbol)s).left;
+                Nodo nodo= new Nodo((String)((java_cup.runtime.Symbol)s).value);
+                RESULT = new Nodo("TIPO",new Nodo[]{nodo});
+            :}
+        | BOOLEAN:b 
+            {:
+                _ultimaLineaDerecha=((java_cup.runtime.Symbol)b).right;
+                _ultimaLineaIzquierda=((java_cup.runtime.Symbol)b).left;
+                Nodo nodo= new Nodo((String)((java_cup.runtime.Symbol)b).value);
+                RESULT = new Nodo("TIPO",new Nodo[]{nodo});
+            :}
+        | CHAR:c 
+            {:
+                _ultimaLineaDerecha=((java_cup.runtime.Symbol)c).right;
+                _ultimaLineaIzquierda=((java_cup.runtime.Symbol)c).left;
+                Nodo nodo= new Nodo((String)((java_cup.runtime.Symbol)c).value);
+                RESULT = new Nodo("TIPO",new Nodo[]{nodo});
+            :}
+;
+
+puntoComa::= PUNTOYCOMA:pc
+        {:
+            _ultimaLineaDerecha=((java_cup.runtime.Symbol)pc).right;
+            _ultimaLineaIzquierda=((java_cup.runtime.Symbol)pc).left;
+            Nodo nodo= new Nodo((String)((java_cup.runtime.Symbol)pc).value);
+            RESULT=nodo;
+        :}
+        |
+        {:
+            addError(new Nodo("Se esperaba punto y coma, en la línea: "+_ultimaLineaDerecha));
+            RESULT=new Nodo("Se esperaba punto y coma, en la línea: "+_ultimaLineaDerecha);
+        :}
+;
+
+defClass::=CLASS:c ID:i DOSPUNTOS:dp
+    {:
+        Nodo classN= new Nodo((String)((java_cup.runtime.Symbol)c).value);
+        Nodo id= new Nodo((String)((java_cup.runtime.Symbol)i).value);
+        Nodo dosp= new Nodo((String)((java_cup.runtime.Symbol)dp).value);
+         RESULT=new Nodo("CLASE",new Nodo[]{classN,id,dosp});
+    :}
+    |CLASS:c ID:i 
+    {:
+        Nodo classN= new Nodo((String)((java_cup.runtime.Symbol)c).value);
+        Nodo id= new Nodo((String)((java_cup.runtime.Symbol)i).value);
+        Nodo dosp= new Nodo("Error en la definición de la clase, en la linea: "+((java_cup.runtime.Symbol)i).right);
+        addError(dosp);
+           RESULT=new Nodo("CLASE",new Nodo[]{classN,id,dosp});
+    :}
+    |CLASS:c error DOSPUNTOS:dp
+    {:
+        Nodo classN= new Nodo((String)((java_cup.runtime.Symbol)c).value);
+        Nodo id= new Nodo("Error en la definición de la clase, en la linea: "+((java_cup.runtime.Symbol)c).right);
+        addError(id);
+        Nodo dosp= new Nodo((String)((java_cup.runtime.Symbol)dp).value);
+         RESULT=new Nodo("CLASE",new Nodo[]{classN,id,dosp});
+    :}
+    |CLASS:c error 
+    {:
+        Nodo classN= new Nodo((String)((java_cup.runtime.Symbol)c).value);
+        Nodo id= new Nodo("Error en la definición de la clase, en la linea: "+((java_cup.runtime.Symbol)c).right);
+        addError(id);
+         RESULT=new Nodo("CLASE",new Nodo[]{classN,id});
+    :}
+;
