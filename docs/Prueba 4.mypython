@@ -1,21 +1,4 @@
-def hola(int p, float x):
-    int x
-    int d
-    d= 1+9+9
-    d/6
-    hola1()
-    hola()
-    ;
-def hola1():
-    d=7
-    ;
-
 int s,p
 list t
 float d
 d=7+8.3
-s+=5*8/p
-p+7*s
-p/9
-hola(5,5.2)
-[1,1,1,"f"+9]

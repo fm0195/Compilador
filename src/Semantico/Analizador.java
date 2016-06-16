@@ -292,6 +292,17 @@ public class Analizador {
             }
         }
     }
+    
+    public ArrayList<RSId> getVariablesGlobales(){
+        return new ArrayList<RSId>(variablesGlobales.values());
+    }
+    public ArrayList<Funcion> getFunciones(){
+        return new ArrayList<Funcion>(funciones.values());
+    }
+    public ArrayList<Registro> getCodigoPrincipal() {
+        return codigoPrincipal;
+    }
+    
     private ArrayList<Registro> tempLista= new ArrayList();
     private boolean autoAsignacion= false;
     private boolean tempParametrosIncorrecta= false;

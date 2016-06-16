@@ -1,6 +1,10 @@
 
 package Semantico;
 
+import FilesScanner.ManagerFile;
+import java.io.FileNotFoundException;
+import java.io.IOException;
+
 import java.util.ArrayList;
 import java.util.HashMap;
 
@@ -12,8 +16,8 @@ public class GeneradorCodigo {
 
   public GeneradorCodigo(String path) {
     int index;
-    index = path.indexOf(".");
-    this.path = path.substring(0, index);
+    index = path.lastIndexOf(".");
+    this.path = path.substring(0, index)+".asm";
     variablesBuffer = new StringBuffer("section .data\n");
     codigoBuffer = new StringBuffer("section .text\n\tglobal _start\n_start:");
   }
@@ -39,7 +43,7 @@ public class GeneradorCodigo {
       case "float":
         res = "dd";
         break;
-      case "bool":
+      case "boolean":
         res = "db";
         break;
       case "char":
@@ -54,7 +58,12 @@ public class GeneradorCodigo {
     return res;
   }
     
-    
+    public void generateAsmFile() throws FileNotFoundException, IOException{
+        String codigo = variablesBuffer.toString()+codigoBuffer.toString();
+        ManagerFile managerFile = new ManagerFile();
+        managerFile.createFile(path, codigo);
+    }
     
     
 }
+    

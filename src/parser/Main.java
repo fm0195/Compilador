@@ -43,7 +43,7 @@ public class Main {
         fr = new FileReader(new File(pathPuntoMyPython));
         Parser p = new Parser(new MyPythonScanner(fr)); 
         Symbol res = p.parse();
-        p.generarCodigo();
+        p.generarCodigo(pathPuntoMyPython);
         Printer printer=new Printer();
         printer.impimirDatos("Errores Léxicos en el programa", p.erroresLexicos());
         printer.impimirDatos("Errores Sintácticos en el programa", p.erroresSintacticos());

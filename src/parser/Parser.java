@@ -10,6 +10,8 @@ import java_cup.runtime.*;
 import java.util.ArrayList;
 import Scanner_Jflex.MyPythonScanner;
 import Semantico.Analizador;
+import Semantico.GeneradorCodigo;
+import java.io.IOException;
 import scanner.BooleanToken;
 import scanner.EOFToken;
 import scanner.ErrorToken;
@@ -2197,8 +2199,15 @@ public class Parser extends java_cup.runtime.lr_parser {
     public ArrayList<IImprimible> erroresSemanticos(){
         return  semantico.getErrores();
     }
-    public void generarCodigo(){
+    public void generarCodigo(String path) throws IOException{
         semantico.validarLlamdos();
+        if(erroresLexicos().size()==0 &&
+                erroresSintacticos().size()==0
+                && erroresSemanticos().size()==0){
+            GeneradorCodigo generador = new GeneradorCodigo(path);
+            generador.generarVariablesGlobales(semantico.getVariablesGlobales());
+            generador.generateAsmFile();
+        }
     }
 
 
