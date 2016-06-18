@@ -4,6 +4,9 @@ import parser.Nodo;
 import java_cup.runtime.*;
 import java.util.ArrayList;
 import Scanner_Jflex.MyPythonScanner;
+import Semantico.Analizador;
+import Semantico.GeneradorCodigo;
+import java.io.IOException;
 import scanner.BooleanToken;
 import scanner.EOFToken;
 import scanner.ErrorToken;
@@ -23,6 +26,7 @@ parser code {:
     private int _ultimaLineaIzquierda=1;
     private ArrayList<IImprimible> errores= new ArrayList<IImprimible>();
     MyPythonScanner s;
+    Analizador semantico=new Analizador();
     public Parser(MyPythonScanner s){ super(s); this.s=s; }
     private void addError(IImprimible nodo){
         errores.add(nodo);
@@ -32,6 +36,19 @@ parser code {:
     }
     public ArrayList<IImprimible> erroresLexicos(){
         return  s.getErrores();
+    }
+    public ArrayList<IImprimible> erroresSemanticos(){
+        return  semantico.getErrores();
+    }
+    public void generarCodigo(String path) throws IOException{
+        semantico.validarLlamdos();
+        if(erroresLexicos().size()==0 &&
+                erroresSintacticos().size()==0
+                && erroresSemanticos().size()==0){
+            GeneradorCodigo generador = new GeneradorCodigo(path);
+            generador.generarVariablesGlobales(semantico.getVariablesGlobales());
+            generador.generateAsmFile();
+        }
     }
 :}
 
@@ -158,6 +175,7 @@ funciones ::= funcDef:fd  funciones:df
 ;
 variablesGlobales ::= declaracionVariables:dv
                     {:
+                        semantico.insertarVariablesGlobales();
                         RESULT = new Nodo("VARIABLES GLOBALES", new Nodo[]{(Nodo) dv});
                     :}
                     | 
@@ -177,6 +195,7 @@ atributos ::= declaracionVariables:dv
 
 variablesLocales ::= declaracionVariables:dv
                     {:
+                        semantico.insertarVariablesGlobales();
                         RESULT = new Nodo("VARIABLES LOCALES", new Nodo[]{(Nodo) dv});
                     :}
                     | 
@@ -187,22 +206,27 @@ variablesLocales ::= declaracionVariables:dv
 declaracionVariables ::= tipo:t ID:i
                     {:
                         Nodo id=new Nodo((String)((java_cup.runtime.Symbol)i).value);
+                        semantico.recordarID((String)((java_cup.runtime.Symbol)i).value,((java_cup.runtime.Symbol) i).right );
                         RESULT = new Nodo("DECLARACION VARIABLES",new Nodo[]{(Nodo) t, id});
                     :}
                     | tipo:t ID:i COMA:c declaracionMultiple:dm 
                     {:
                         Nodo id=new Nodo((String)((java_cup.runtime.Symbol)i).value);
                         Nodo com=new Nodo((String)((java_cup.runtime.Symbol)c).value);
+                        semantico.recordarID((String)((java_cup.runtime.Symbol)i).value,((java_cup.runtime.Symbol) i).right );
                         RESULT = new Nodo("DECLARACION VARIABLES",new Nodo[]{(Nodo) t, id, com, (Nodo) dm});
                     :}
                     | tipo:t ID:i declaracionVariables:dv 
                     {:
                         Nodo id=new Nodo((String)((java_cup.runtime.Symbol)i).value);
+                        semantico.insertarVariablesGlobales();
+                        semantico.recordarID((String)((java_cup.runtime.Symbol)i).value,((java_cup.runtime.Symbol) i).right );
                         RESULT = new Nodo("DECLARACION VARIABLES",new Nodo[]{(Nodo) t, id, (Nodo) dv});
                     :}
                     |tipo declaracionVariables:dv
                     {:
                         addError(new Nodo("Error en la declaracion de la variable, en la linea: "+_ultimaLineaIzquierda));
+                        semantico.insertarVariablesGlobales();
                         RESULT = new Nodo("Error en la declaracion de la variable, en la linea: "+_ultimaLineaIzquierda,
                                      new Nodo[]{(Nodo)dv});
                     :}
@@ -216,6 +240,7 @@ declaracionMultiple ::= ID:i COMA:c declaracionMultiple:dm
                     {:
                         Nodo id=new Nodo((String)((java_cup.runtime.Symbol)i).value);
                         Nodo com=new Nodo((String)((java_cup.runtime.Symbol)c).value);
+                        semantico.recordarID((String)((java_cup.runtime.Symbol)i).value,((java_cup.runtime.Symbol) i).right );
                         RESULT = new Nodo("DECLARACION MULTIPLE",new Nodo[]{ id, com, (Nodo) dm});
                     :}
                     | ID:i
@@ -223,11 +248,14 @@ declaracionMultiple ::= ID:i COMA:c declaracionMultiple:dm
                         _ultimaLineaDerecha=((java_cup.runtime.Symbol)i).right;
                         _ultimaLineaIzquierda=((java_cup.runtime.Symbol)i).left;
                         Nodo id=new Nodo((String)((java_cup.runtime.Symbol)i).value);
+                        semantico.recordarID((String)((java_cup.runtime.Symbol)i).value,((java_cup.runtime.Symbol) i).right );
                         RESULT = new Nodo("DECLARACION MULTIPLE",new Nodo[]{ id});
                     :}
                     | ID:i declaracionVariables:dv 
                     {:
                         Nodo id=new Nodo((String)((java_cup.runtime.Symbol)i).value);
+                        semantico.insertarVariablesGlobales();
+                        semantico.recordarID((String)((java_cup.runtime.Symbol)i).value,((java_cup.runtime.Symbol) i).right );
                         RESULT = new Nodo("DECLARACION VARIABLES",new Nodo[]{id,(Nodo) dv});
                     :}
 ;
@@ -246,6 +274,7 @@ codigoFuncion ::=   codigo:rc codigoFuncion:cf
                     :}
                     |
                     {:
+                        semantico.marcaNull();
                         RESULT = new Nodo("CODIGO");
                     :}
 
@@ -254,6 +283,8 @@ codigoFuncion ::=   codigo:rc codigoFuncion:cf
                         Nodo id=new Nodo((String)((java_cup.runtime.Symbol)b).value);
                         _ultimaLineaDerecha=((java_cup.runtime.Symbol)b).right;
                         _ultimaLineaIzquierda=((java_cup.runtime.Symbol)b).left;
+                        semantico.quitarMarca();
+                        semantico.quitarProximaMarca();
                         RESULT = new Nodo("CODIGO", new Nodo[]{(Nodo)rc1, id, (Nodo)rc2});
                     :}
                     | codigoFuncion:rc1 CONTINUE:b codigoFuncion:rc2
@@ -261,6 +292,8 @@ codigoFuncion ::=   codigo:rc codigoFuncion:cf
                         Nodo id=new Nodo((String)((java_cup.runtime.Symbol)b).value);
                         _ultimaLineaDerecha=((java_cup.runtime.Symbol)b).right;
                         _ultimaLineaIzquierda=((java_cup.runtime.Symbol)b).left;
+                        semantico.quitarMarca();
+                        semantico.quitarProximaMarca();
                         RESULT = new Nodo("CODIGO", new Nodo[]{(Nodo)rc1, id, (Nodo)rc2});
                     :}
 ;
@@ -317,6 +350,7 @@ for::=FOR:f ID:i IN:in alcanceFor:af DOSPUNTOS:dp codigoFuncion:cf puntoComa:pc
         Nodo id=new Nodo((String)((java_cup.runtime.Symbol)i).value);
         Nodo inN=new Nodo((String)((java_cup.runtime.Symbol)in).value);
         Nodo dosp=new Nodo((String)((java_cup.runtime.Symbol)dp).value);
+        semantico.quitarMarca();
         RESULT=new Nodo("Definición del ciclo For",new Nodo[]{forN,id,inN,(Nodo)af,dosp,(Nodo)cf,(Nodo)pc});
     :}
     |
@@ -326,6 +360,7 @@ for::=FOR:f ID:i IN:in alcanceFor:af DOSPUNTOS:dp codigoFuncion:cf puntoComa:pc
         Nodo id=new Nodo("Error en la declaracion del for, en la línea: "+((java_cup.runtime.Symbol)f).right);
         addError(id);
         Nodo dosp=new Nodo((String)((java_cup.runtime.Symbol)dp).value);
+        semantico.quitarMarca();
         RESULT=new Nodo("Definición del ciclo For",new Nodo[]{forN,id, dosp,(Nodo)cf,(Nodo)pc});
     :}
     |
@@ -455,7 +490,7 @@ tryexcept::= TRY:t DOSPUNTOS:dp codigoFuncion:cf puntoComa:pc except:ex deffinal
         {:
             Nodo tryN=new Nodo((String)((java_cup.runtime.Symbol)t).value);
             Nodo dosp=new Nodo((String)((java_cup.runtime.Symbol)dp).value);
-
+            semantico.quitarProximaMarca();
             RESULT=new Nodo("Definicion de un try",new Nodo[]{tryN,dosp,(Nodo)cf,(Nodo)pc,
                             (Nodo)ex,(Nodo)f});
         :}
@@ -463,7 +498,7 @@ tryexcept::= TRY:t DOSPUNTOS:dp codigoFuncion:cf puntoComa:pc except:ex deffinal
         {:
             Nodo tryN=new Nodo((String)((java_cup.runtime.Symbol)t).value);
             Nodo dosp=new Nodo((String)((java_cup.runtime.Symbol)dp).value);
-
+            semantico.quitarProximaMarca();
             RESULT=new Nodo("Definicion de un try",new Nodo[]{tryN,dosp,(Nodo)cf,(Nodo)pc,
                             (Nodo)ex,(Nodo)f});
         :}
@@ -480,6 +515,7 @@ tryexcept::= TRY:t DOSPUNTOS:dp codigoFuncion:cf puntoComa:pc except:ex deffinal
             Nodo tryN=new Nodo((String)((java_cup.runtime.Symbol)t).value);
             Nodo errorT=new Nodo("Error en la definición del try, en la línea: "+((java_cup.runtime.Symbol)t).right);
             addError(errorT);
+            semantico.quitarProximaMarca();
            RESULT = new Nodo("TRY",new Nodo[]{tryN,errorT,(Nodo)cf,(Nodo)pc,(Nodo)ex,(Nodo)f});
         :}
         | TRY:t error codigoFuncion:cf puntoComa:pc deffinally:f
@@ -489,6 +525,7 @@ tryexcept::= TRY:t DOSPUNTOS:dp codigoFuncion:cf puntoComa:pc except:ex deffinal
             addError(errorT);
             Nodo errorE=new Nodo("Error seccion except no definida, especificamente en la línea del Try: "+((java_cup.runtime.Symbol)t).right);
             addError(errorE);
+            semantico.quitarProximaMarca();
            RESULT = new Nodo("TRY",new Nodo[]{tryN,errorT,(Nodo)cf,(Nodo)pc,errorE,(Nodo)f});
         :}
         | TRY:t DOSPUNTOS:dp codigoFuncion:cf puntoComa:pc deffinally:f
@@ -497,6 +534,7 @@ tryexcept::= TRY:t DOSPUNTOS:dp codigoFuncion:cf puntoComa:pc except:ex deffinal
            Nodo dosp=new Nodo((String)((java_cup.runtime.Symbol)dp).value);
             Nodo errorE=new Nodo("Error seccion except no definida, especificamente en la línea del Try: "+((java_cup.runtime.Symbol)t).right);
             addError(errorE);
+            semantico.quitarProximaMarca();
            RESULT = new Nodo("TRY",new Nodo[]{tryN,dosp,(Nodo)cf,(Nodo)pc,errorE,(Nodo)f});
         :}
 ;
@@ -506,6 +544,7 @@ except::=EXCEPT:ex ID:i DOSPUNTOS:dp1  codigoFuncion:cf1 puntoComa:pc1
             Nodo except=new Nodo((String)((java_cup.runtime.Symbol)ex).value);
             Nodo error=new Nodo((String)((java_cup.runtime.Symbol)i).value);
             Nodo dosp1=new Nodo((String)((java_cup.runtime.Symbol)dp1).value);
+            semantico.quitarMarca();
             RESULT=new Nodo("Definicion de un except",new Nodo[]{except,error,dosp1,(Nodo)cf1,(Nodo)pc1});
         :}
         |
@@ -514,6 +553,7 @@ except::=EXCEPT:ex ID:i DOSPUNTOS:dp1  codigoFuncion:cf1 puntoComa:pc1
             Nodo except=new Nodo((String)((java_cup.runtime.Symbol)ex).value);
             Nodo dosp1=new Nodo((String)((java_cup.runtime.Symbol)dp1).value);
             //Nodo pcoma1=new Nodo((String)((java_cup.runtime.Symbol)pc1).value);
+            semantico.quitarMarca();
             RESULT=new Nodo("Definicion de un except",new Nodo[]{except,dosp1,(Nodo)cf1,(Nodo)pc1});
         :}
         |EXCEPT:ex error DOSPUNTOS:dp1  codigoFuncion:cf1 puntoComa:pc1 
@@ -522,6 +562,7 @@ except::=EXCEPT:ex ID:i DOSPUNTOS:dp1  codigoFuncion:cf1 puntoComa:pc1
             Nodo errorF=new Nodo("Error en el identificador del except, en la linea: "+((java_cup.runtime.Symbol)ex).right);
             addError(errorF);
             Nodo dosp1=new Nodo((String)((java_cup.runtime.Symbol)dp1).value);
+            semantico.quitarMarca();
             RESULT=new Nodo("Definicion de un except",new Nodo[]{except,errorF,dosp1,(Nodo)cf1,(Nodo)pc1});
         :}
         |EXCEPT:ex ID:i error puntoComa:pc1 
@@ -544,6 +585,7 @@ deffinally::= FINALLY:f DOSPUNTOS:dp codigoFuncion:cf puntoComa:pc
         {:
             Nodo finallyN=new Nodo((String)((java_cup.runtime.Symbol)f).value);
             Nodo dosp=new Nodo((String)((java_cup.runtime.Symbol)dp).value);
+            semantico.quitarMarca();
             RESULT=new Nodo("Definicion de un finally",new Nodo[]{finallyN,dosp,(Nodo)cf,(Nodo)pc});
         :}
         |
@@ -562,6 +604,7 @@ while ::= WHILE:w expresionBooleana:eb DOSPUNTOS:dp codigoFuncion:c puntoComa:pc
         {:
             Nodo whl=new Nodo((String)((java_cup.runtime.Symbol)w).value);
             Nodo dosPuntos=new Nodo((String)((java_cup.runtime.Symbol)dp).value);
+            semantico.quitarMarca();
             RESULT = new Nodo("WHILE",new Nodo[]{whl, (Nodo) eb, dosPuntos,(Nodo) c, (Nodo)pc});
         :}
         | WHILE:w error DOSPUNTOS:dp codigoFuncion:c puntoComa:pc
@@ -569,6 +612,7 @@ while ::= WHILE:w expresionBooleana:eb DOSPUNTOS:dp codigoFuncion:c puntoComa:pc
             Nodo whl=new Nodo((String)((java_cup.runtime.Symbol)w).value);
             Nodo dosPuntos=new Nodo("Error en la definicion del While, en la linea: "+((java_cup.runtime.Symbol)w).right);
             addError(dosPuntos);
+            semantico.quitarMarca();
             RESULT = new Nodo("WHILE",new Nodo[]{whl, dosPuntos,(Nodo) c, (Nodo)pc});
         :}
         | WHILE:w error codigoFuncion:c puntoComa:pc
@@ -576,6 +620,7 @@ while ::= WHILE:w expresionBooleana:eb DOSPUNTOS:dp codigoFuncion:c puntoComa:pc
             Nodo whl=new Nodo((String)((java_cup.runtime.Symbol)w).value);
             Nodo dosPuntos=new Nodo("Error en la definicion del While, en la linea: "+((java_cup.runtime.Symbol)w).right);
             addError(dosPuntos);
+            semantico.quitarMarca();
             RESULT = new Nodo("WHILE",new Nodo[]{whl, dosPuntos,(Nodo)c ,(Nodo)pc});
         :}
         
@@ -584,12 +629,14 @@ if ::= IF:w expresionBooleana:eb DOSPUNTOS:dp codigoFuncion:c puntoComa:pc
         {:
             Nodo whl=new Nodo((String)((java_cup.runtime.Symbol)w).value);
             Nodo dosPuntos=new Nodo((String)((java_cup.runtime.Symbol)dp).value);
+            semantico.recordarIF(true,((java_cup.runtime.Symbol)w).right,false);
             RESULT = new Nodo("IF",new Nodo[]{whl, (Nodo) eb, dosPuntos,(Nodo) c, (Nodo)pc});
         :}
         |IF:w expresionBooleana:eb DOSPUNTOS:dp codigoFuncion:c puntoComa:pc elseIf:ei
         {:
             Nodo whl=new Nodo((String)((java_cup.runtime.Symbol)w).value);
             Nodo dosPuntos=new Nodo((String)((java_cup.runtime.Symbol)dp).value);
+            semantico.recordarIF(false,((java_cup.runtime.Symbol)w).right,false);
             RESULT = new Nodo("IF",new Nodo[]{whl, (Nodo) eb, dosPuntos,(Nodo) c, (Nodo)pc,(Nodo)ei});
         :}
         |IF:w error DOSPUNTOS:dp codigoFuncion:c puntoComa:pc
@@ -597,6 +644,7 @@ if ::= IF:w expresionBooleana:eb DOSPUNTOS:dp codigoFuncion:c puntoComa:pc
             Nodo whl=new Nodo((String)((java_cup.runtime.Symbol)w).value);
             Nodo dosPuntos=new Nodo((String)((java_cup.runtime.Symbol)dp).value);
             addError(new Nodo("Error en la definicion del If, en la linea: "+((java_cup.runtime.Symbol)w).right));
+            semantico.quitarMarca();
             RESULT = new Nodo("IF",new Nodo[]{whl, new Nodo("Error en la definicion del If, en la linea: "+((java_cup.runtime.Symbol)w).right), dosPuntos,(Nodo) c, (Nodo)pc});
         :}
         |IF:w error DOSPUNTOS:dp codigoFuncion:c puntoComa:pc elseIf:ei
@@ -604,6 +652,7 @@ if ::= IF:w expresionBooleana:eb DOSPUNTOS:dp codigoFuncion:c puntoComa:pc
             Nodo whl=new Nodo((String)((java_cup.runtime.Symbol)w).value);
             Nodo dosPuntos=new Nodo((String)((java_cup.runtime.Symbol)dp).value);
             addError(new Nodo("Error en la definicion del If, en la linea: "+((java_cup.runtime.Symbol)w).right));
+            semantico.quitarMarca();
             RESULT = new Nodo("IF",new Nodo[]{whl, new Nodo("Error en la definicion del If, en la linea: "+((java_cup.runtime.Symbol)w).right),
                                                  dosPuntos,(Nodo) c, (Nodo)pc,(Nodo)ei});
         :}
@@ -627,12 +676,14 @@ elseIf::= ELIF:ei expresionBooleana:eb DOSPUNTOS:dp codigoFuncion:c puntoComa:pc
         {:
             Nodo whl=new Nodo((String)((java_cup.runtime.Symbol)ei).value);
             Nodo dosPuntos=new Nodo((String)((java_cup.runtime.Symbol)dp).value);
+            semantico.recordarIF(false,((java_cup.runtime.Symbol)ei).right,false);
             RESULT = new Nodo("ELIF",new Nodo[]{whl, (Nodo) eb, dosPuntos,(Nodo) c, (Nodo)pc,(Nodo)ei1});
         :}
         | ELSE:e DOSPUNTOS:dp codigoFuncion:c puntoComa:pc
         {:
             Nodo whl=new Nodo((String)((java_cup.runtime.Symbol)e).value);
             Nodo dosPuntos=new Nodo((String)((java_cup.runtime.Symbol)dp).value);
+            semantico.recordarIF(true,((java_cup.runtime.Symbol)e).right,false);
             RESULT = new Nodo("ELSE",new Nodo[]{whl, dosPuntos,(Nodo) c, (Nodo)pc});
         :}
         | ELIF:ei error DOSPUNTOS:dp codigoFuncion:c puntoComa:pc elseIf:ei1
@@ -640,6 +691,7 @@ elseIf::= ELIF:ei expresionBooleana:eb DOSPUNTOS:dp codigoFuncion:c puntoComa:pc
             Nodo whl=new Nodo((String)((java_cup.runtime.Symbol)ei).value);
             Nodo dosPuntos=new Nodo((String)((java_cup.runtime.Symbol)dp).value);
             addError(new Nodo("Error en la definicion del Elif, en la linea: "+((java_cup.runtime.Symbol)ei).right));
+            semantico.quitarMarca();
             RESULT = new Nodo("ELIF",new Nodo[]{whl, new Nodo("Error en la definicion del Elif, en la linea: "+((java_cup.runtime.Symbol)ei).right), 
                         dosPuntos,(Nodo) c, (Nodo)pc,(Nodo)ei1});
         :}
@@ -658,6 +710,7 @@ elseIf::= ELIF:ei expresionBooleana:eb DOSPUNTOS:dp codigoFuncion:c puntoComa:pc
             _ultimaLineaIzquierda=((java_cup.runtime.Symbol)e).left;
             Nodo whl=new Nodo((String)((java_cup.runtime.Symbol)e).value);
             Nodo dosPuntos=new Nodo((String)((java_cup.runtime.Symbol)dp).value);
+            semantico.recordarIF(true,((java_cup.runtime.Symbol)e).right,true);
             RESULT = new Nodo("ELSE",new Nodo[]{whl, dosPuntos,(Nodo) c, (Nodo)pc});
         :}
         | ELSE:e error puntoComa:pc
@@ -674,6 +727,7 @@ elseIf::= ELIF:ei expresionBooleana:eb DOSPUNTOS:dp codigoFuncion:c puntoComa:pc
             Nodo whl=new Nodo((String)((java_cup.runtime.Symbol)ei).value);
             Nodo dosPuntos=new Nodo((String)((java_cup.runtime.Symbol)dp).value);
             addError(new Nodo("Error en la definicion del Elif, en la linea: "+((java_cup.runtime.Symbol)ei).right));
+            semantico.quitarMarca();
             RESULT = new Nodo("ELIF",new Nodo[]{whl, new Nodo("Error en la definicion del Elif, en la linea: "+((java_cup.runtime.Symbol)ei).right), 
                         dosPuntos,(Nodo) c, (Nodo)pc});
         :}
@@ -690,6 +744,7 @@ elseIf::= ELIF:ei expresionBooleana:eb DOSPUNTOS:dp codigoFuncion:c puntoComa:pc
         {:
             Nodo whl=new Nodo((String)((java_cup.runtime.Symbol)ei).value);
             Nodo dosPuntos=new Nodo((String)((java_cup.runtime.Symbol)dp).value);
+            semantico.recordarIF(true,((java_cup.runtime.Symbol)ei).right,false);
             RESULT = new Nodo("ELIF",new Nodo[]{whl, (Nodo) eb, dosPuntos,(Nodo) c, (Nodo)pc});
         :}
 ;
@@ -698,60 +753,90 @@ expresionBooleana ::=
                     expresion:o IGUALCOMP:m expresion:ca
                     {:
                         Nodo n=new Nodo((String)((java_cup.runtime.Symbol)m).value);
+                        semantico.recordarOperador((String)((java_cup.runtime.Symbol)m).value,((java_cup.runtime.Symbol)m).right);
+                        semantico.crearOperacion();
+                        semantico.marcaNull();
                         RESULT = new Nodo("Contenido", new Nodo[]{(Nodo)o,n,(Nodo)ca});
                     :}
                     |
                     expresion:o AND:m expresion:ca
                     {:
                         Nodo n=new Nodo((String)((java_cup.runtime.Symbol)m).value);
+                        semantico.recordarOperador((String)((java_cup.runtime.Symbol)m).value,((java_cup.runtime.Symbol)m).right);
+                        semantico.crearOperacion();
+                        semantico.marcaNull();
                         RESULT = new Nodo("Contenido", new Nodo[]{(Nodo)o,n,(Nodo)ca});
                     :}
                     |
                     expresion:o OR:m expresion:ca
                     {:
                         Nodo n=new Nodo((String)((java_cup.runtime.Symbol)m).value);
+                        semantico.recordarOperador((String)((java_cup.runtime.Symbol)m).value,((java_cup.runtime.Symbol)m).right);
+                        semantico.crearOperacion();
+                        semantico.marcaNull();
                         RESULT = new Nodo("Contenido", new Nodo[]{(Nodo)o,n,(Nodo)ca});
                     :}
                     |
                     expresion:o NOT:m expresion:ca
                     {:
                         Nodo n=new Nodo((String)((java_cup.runtime.Symbol)m).value);
+                        semantico.recordarOperador((String)((java_cup.runtime.Symbol)m).value,((java_cup.runtime.Symbol)m).right);
+                        semantico.crearOperacion();
+                        semantico.marcaNull();
                         RESULT = new Nodo("Contenido", new Nodo[]{(Nodo)o,n,(Nodo)ca});
                     :}
                     |
                     expresion:o DIFERENTE:m expresion:ca
                     {:
                         Nodo n=new Nodo((String)((java_cup.runtime.Symbol)m).value);
+                        semantico.recordarOperador((String)((java_cup.runtime.Symbol)m).value,((java_cup.runtime.Symbol)m).right);
+                        semantico.crearOperacion();
+                        semantico.marcaNull();
                         RESULT = new Nodo("Contenido", new Nodo[]{(Nodo)o,n,(Nodo)ca});
                     :}
                     |
                     expresion:o DISTINTO:m expresion:ca
                     {:
                         Nodo n=new Nodo((String)((java_cup.runtime.Symbol)m).value);
+                        semantico.recordarOperador((String)((java_cup.runtime.Symbol)m).value,((java_cup.runtime.Symbol)m).right);
+                        semantico.crearOperacion();
+                        semantico.marcaNull();
                         RESULT = new Nodo("Contenido", new Nodo[]{(Nodo)o,n,(Nodo)ca});
                     :}
                     |
                     expresion:o MAYORIGUAL:m expresion:ca
                     {:
                         Nodo n=new Nodo((String)((java_cup.runtime.Symbol)m).value);
+                        semantico.recordarOperador((String)((java_cup.runtime.Symbol)m).value,((java_cup.runtime.Symbol)m).right);
+                        semantico.crearOperacion();
+                        semantico.marcaNull();
                         RESULT = new Nodo("Contenido", new Nodo[]{(Nodo)o,n,(Nodo)ca});
                     :}
                     |
                     expresion:o MENORIGUAL:m expresion:ca
                     {:
                         Nodo n=new Nodo((String)((java_cup.runtime.Symbol)m).value);
+                        semantico.recordarOperador((String)((java_cup.runtime.Symbol)m).value,((java_cup.runtime.Symbol)m).right);
+                        semantico.crearOperacion();
+                        semantico.marcaNull();
                         RESULT = new Nodo("Contenido", new Nodo[]{(Nodo)o,n,(Nodo)ca});
                     :}
                     |
                     expresion:o MAYOR:m expresion:ca
                     {:
                         Nodo n=new Nodo((String)((java_cup.runtime.Symbol)m).value);
+                        semantico.recordarOperador((String)((java_cup.runtime.Symbol)m).value,((java_cup.runtime.Symbol)m).right);
+                        semantico.crearOperacion();
+                        semantico.marcaNull();
                         RESULT = new Nodo("Contenido", new Nodo[]{(Nodo)o,n,(Nodo)ca});
                     :}
                     |
                     expresion:o MENOR:m expresion:ca
                     {:
                         Nodo n=new Nodo((String)((java_cup.runtime.Symbol)m).value);
+                        semantico.recordarOperador((String)((java_cup.runtime.Symbol)m).value,((java_cup.runtime.Symbol)m).right);
+                        semantico.crearOperacion();
+                        semantico.marcaNull();
                         RESULT = new Nodo("Contenido", new Nodo[]{(Nodo)o,n,(Nodo)ca});
                     :}
                     |
@@ -761,8 +846,16 @@ expresionBooleana ::=
                         Nodo n1=new Nodo((String)((java_cup.runtime.Symbol)pd).value);
                         RESULT = new Nodo("Contenido", new Nodo[]{n, (Nodo)ca, n1});
                     :}
+|
+                    PARENTESISIZQ:pi expresionBooleana:ca PARENTESISDER:pd
+                    {:
+                        Nodo n=new Nodo((String)((java_cup.runtime.Symbol)pi).value);
+                        Nodo n1=new Nodo((String)((java_cup.runtime.Symbol)pd).value);
+                        RESULT = new Nodo("Contenido", new Nodo[]{n, (Nodo)ca, n1});
+                    :}
                     | objeto:o
                     {:
+                        semantico.marcaNull();
                         RESULT = new Nodo("Contenido", new Nodo[]{(Nodo)o});
                     :}
 ;
@@ -770,10 +863,14 @@ asignacion::=
                     ID:i opAsig:op expresion:ca
                     {:
                         Nodo n=new Nodo((String)((java_cup.runtime.Symbol)i).value);
+                        semantico.recordarVariable(((java_cup.runtime.Symbol)i).right,(String)((java_cup.runtime.Symbol)i).value );
+                        semantico.agregarAsignacion();
                         RESULT = new Nodo("ASIGNACION", new Nodo[]{n,(Nodo)op,(Nodo)ca});
                     :}
                     |variableIndexada:i opAsig:op expresion:ca
                     {:
+                        semantico.ajustarPila();
+                        semantico.agregarAsignacion();
                         RESULT = new Nodo("ASIGNACION", new Nodo[]{(Nodo)i,(Nodo)op,(Nodo)ca});
                     :}
                     |
@@ -808,6 +905,7 @@ opAsig::= ASIGNACION:a
                         _ultimaLineaDerecha=((java_cup.runtime.Symbol)mi).right;
                         _ultimaLineaIzquierda=((java_cup.runtime.Symbol)mi).left;
                         Nodo n=new Nodo((String)((java_cup.runtime.Symbol)mi).value);
+                        semantico.recordarAutoAsignador("+", _ultimaLineaDerecha);
                         RESULT = new Nodo("OPERADOR", new Nodo[]{n});
                     :}
         | MENOSIGUAL:mi 
@@ -815,6 +913,7 @@ opAsig::= ASIGNACION:a
                         _ultimaLineaDerecha=((java_cup.runtime.Symbol)mi).right;
                         _ultimaLineaIzquierda=((java_cup.runtime.Symbol)mi).left;
                         Nodo n=new Nodo((String)((java_cup.runtime.Symbol)mi).value);
+                        semantico.recordarAutoAsignador("-", _ultimaLineaDerecha);
                         RESULT = new Nodo("OPERADOR", new Nodo[]{n});
                     :}
         | MULTIGUAL:mi 
@@ -822,6 +921,7 @@ opAsig::= ASIGNACION:a
                         _ultimaLineaDerecha=((java_cup.runtime.Symbol)mi).right;
                         _ultimaLineaIzquierda=((java_cup.runtime.Symbol)mi).left;
                         Nodo n=new Nodo((String)((java_cup.runtime.Symbol)mi).value);
+                        semantico.recordarAutoAsignador("*", _ultimaLineaDerecha);
                         RESULT = new Nodo("OPERADOR", new Nodo[]{n});
                     :}
         | DIVIGUAL:di 
@@ -829,6 +929,7 @@ opAsig::= ASIGNACION:a
                         _ultimaLineaDerecha=((java_cup.runtime.Symbol)di).right;
                         _ultimaLineaIzquierda=((java_cup.runtime.Symbol)di).left;
                         Nodo n=new Nodo((String)((java_cup.runtime.Symbol)di).value);
+                        semantico.recordarAutoAsignador("/", _ultimaLineaDerecha);
                         RESULT = new Nodo("OPERADOR", new Nodo[]{n});
                     :}
         | POTIGUAL:pi
@@ -836,6 +937,7 @@ opAsig::= ASIGNACION:a
                         _ultimaLineaDerecha=((java_cup.runtime.Symbol)pi).right;
                         _ultimaLineaIzquierda=((java_cup.runtime.Symbol)pi).left;
                         Nodo n=new Nodo((String)((java_cup.runtime.Symbol)pi).value);
+                        semantico.recordarAutoAsignador("**", _ultimaLineaDerecha);
                         RESULT = new Nodo("OPERADOR", new Nodo[]{n});
                     :}
         | DIVENTIGUAL:dei
@@ -843,6 +945,7 @@ opAsig::= ASIGNACION:a
                         _ultimaLineaDerecha=((java_cup.runtime.Symbol)dei).right;
                         _ultimaLineaIzquierda=((java_cup.runtime.Symbol)dei).left;
                         Nodo n=new Nodo((String)((java_cup.runtime.Symbol)dei).value);
+                        semantico.recordarAutoAsignador("//", _ultimaLineaDerecha);
                         RESULT = new Nodo("OPERADOR", new Nodo[]{n});
                     :}
         | MODIGUAL:mi
@@ -850,130 +953,178 @@ opAsig::= ASIGNACION:a
                         _ultimaLineaDerecha=((java_cup.runtime.Symbol)mi).right;
                         _ultimaLineaIzquierda=((java_cup.runtime.Symbol)mi).left;
                         Nodo n=new Nodo((String)((java_cup.runtime.Symbol)mi).value);
+                        semantico.recordarAutoAsignador("%", _ultimaLineaDerecha);
                         RESULT = new Nodo("OPERADOR", new Nodo[]{n});
                     :}
 ;
 expresion::=        expresion:o MAS:m expresion:ca
                     {:
                         Nodo n=new Nodo((String)((java_cup.runtime.Symbol)m).value);
+                        semantico.recordarOperador((String)((java_cup.runtime.Symbol)m).value,caright);
+                        semantico.crearOperacion();
                         RESULT = new Nodo("Contenido", new Nodo[]{(Nodo)o,n,(Nodo)ca});
                     :}
                     |
                     expresion:o MENOS:m expresion:ca
                     {:
                         Nodo n=new Nodo((String)((java_cup.runtime.Symbol)m).value);
+                        semantico.recordarOperador((String)((java_cup.runtime.Symbol)m).value,caright);
+                        semantico.crearOperacion();
                         RESULT = new Nodo("Contenido", new Nodo[]{(Nodo)o,n,(Nodo)ca});
                     :}
                     |
                     expresion:o MULT:m expresion:ca
                     {:
                         Nodo n=new Nodo((String)((java_cup.runtime.Symbol)m).value);
+                        semantico.recordarOperador((String)((java_cup.runtime.Symbol)m).value,caright);
+                        semantico.crearOperacion();
                         RESULT = new Nodo("Contenido", new Nodo[]{(Nodo)o,n,(Nodo)ca});
                     :}
                     |
                     expresion:o DIV:m expresion:ca
                     {:
                         Nodo n=new Nodo((String)((java_cup.runtime.Symbol)m).value);
+                        semantico.recordarOperador((String)((java_cup.runtime.Symbol)m).value,caright);
+                        semantico.crearOperacion();
                         RESULT = new Nodo("Contenido", new Nodo[]{(Nodo)o,n,(Nodo)ca});
                     :}
                     |
                     expresion:o DIVENT:m expresion:ca
                     {:
                         Nodo n=new Nodo((String)((java_cup.runtime.Symbol)m).value);
+                        semantico.recordarOperador((String)((java_cup.runtime.Symbol)m).value,caright);
+                        semantico.crearOperacion();
                         RESULT = new Nodo("Contenido", new Nodo[]{(Nodo)o,n,(Nodo)ca});
                     :}
                     |
                     expresion:o MOD:m expresion:ca
                     {:
                         Nodo n=new Nodo((String)((java_cup.runtime.Symbol)m).value);
+                        semantico.recordarOperador((String)((java_cup.runtime.Symbol)m).value,caright);
+                        semantico.crearOperacion();
                         RESULT = new Nodo("Contenido", new Nodo[]{(Nodo)o,n,(Nodo)ca});
                     :}
                     |
                     expresion:o POTENCIA:m expresion:ca
                     {:
                         Nodo n=new Nodo((String)((java_cup.runtime.Symbol)m).value);
+                        semantico.recordarOperador((String)((java_cup.runtime.Symbol)m).value,caright);
+                        semantico.crearOperacion();
                         RESULT = new Nodo("Contenido", new Nodo[]{(Nodo)o,n,(Nodo)ca});
                     :}
                     |
                     expresion:o IGUALCOMP:m expresion:ca
                     {:
                         Nodo n=new Nodo((String)((java_cup.runtime.Symbol)m).value);
+                        semantico.recordarOperador((String)((java_cup.runtime.Symbol)m).value,caright);
+                        semantico.crearOperacion();
                         RESULT = new Nodo("Contenido", new Nodo[]{(Nodo)o,n,(Nodo)ca});
                     :}
                     |
                     expresion:o DIFERENTE:m expresion:ca
                     {:
                         Nodo n=new Nodo((String)((java_cup.runtime.Symbol)m).value);
+                        semantico.recordarOperador((String)((java_cup.runtime.Symbol)m).value,caright);
+                        semantico.crearOperacion();
                         RESULT = new Nodo("Contenido", new Nodo[]{(Nodo)o,n,(Nodo)ca});
                     :}
                     |
                     expresion:o DISTINTO:m expresion:ca
                     {:
                         Nodo n=new Nodo((String)((java_cup.runtime.Symbol)m).value);
+                        semantico.recordarOperador((String)((java_cup.runtime.Symbol)m).value,caright);
+                        semantico.crearOperacion();
                         RESULT = new Nodo("Contenido", new Nodo[]{(Nodo)o,n,(Nodo)ca});
                     :}
                     |
                     expresion:o MAYORIGUAL:m expresion:ca
                     {:
                         Nodo n=new Nodo((String)((java_cup.runtime.Symbol)m).value);
+                        semantico.recordarOperador((String)((java_cup.runtime.Symbol)m).value,caright);
+                        semantico.crearOperacion();
                         RESULT = new Nodo("Contenido", new Nodo[]{(Nodo)o,n,(Nodo)ca});
                     :}
                     |
                     expresion:o MENORIGUAL:m expresion:ca
                     {:
                         Nodo n=new Nodo((String)((java_cup.runtime.Symbol)m).value);
+                        semantico.recordarOperador((String)((java_cup.runtime.Symbol)m).value,caright);
+                        semantico.crearOperacion();
                         RESULT = new Nodo("Contenido", new Nodo[]{(Nodo)o,n,(Nodo)ca});
                     :}
                     |
                     expresion:o SHL:m expresion:ca
                     {:
                         Nodo n=new Nodo((String)((java_cup.runtime.Symbol)m).value);
+                        semantico.recordarOperador((String)((java_cup.runtime.Symbol)m).value,caright);
+                        semantico.crearOperacion();
                         RESULT = new Nodo("Contenido", new Nodo[]{(Nodo)o,n,(Nodo)ca});
                     :}
                     |
                     expresion:o SHR:m expresion:ca
                     {:
                         Nodo n=new Nodo((String)((java_cup.runtime.Symbol)m).value);
+                        semantico.recordarOperador((String)((java_cup.runtime.Symbol)m).value,caright);
+                        semantico.crearOperacion();
                         RESULT = new Nodo("Contenido", new Nodo[]{(Nodo)o,n,(Nodo)ca});
                     :}
                     |
                     expresion:o BITAND:m expresion:ca
                     {:
                         Nodo n=new Nodo((String)((java_cup.runtime.Symbol)m).value);
+                        semantico.recordarOperador((String)((java_cup.runtime.Symbol)m).value,caright);
+                        semantico.crearOperacion();
                         RESULT = new Nodo("Contenido", new Nodo[]{(Nodo)o,n,(Nodo)ca});
                     :}
                     |
                     expresion:o BITOR:m expresion:ca
                     {:
                         Nodo n=new Nodo((String)((java_cup.runtime.Symbol)m).value);
+                        semantico.recordarOperador((String)((java_cup.runtime.Symbol)m).value,caright);
+                        semantico.crearOperacion();
                         RESULT = new Nodo("Contenido", new Nodo[]{(Nodo)o,n,(Nodo)ca});
                     :}
                     |
                     expresion:o BITXOR:m expresion:ca
                     {:
                         Nodo n=new Nodo((String)((java_cup.runtime.Symbol)m).value);
+                        semantico.recordarOperador((String)((java_cup.runtime.Symbol)m).value,caright);
+                        semantico.crearOperacion();
                         RESULT = new Nodo("Contenido", new Nodo[]{(Nodo)o,n,(Nodo)ca});
                     :}
                     |
                     expresion:o BITNOT:m expresion:ca
                     {:
                         Nodo n=new Nodo((String)((java_cup.runtime.Symbol)m).value);
+                        semantico.recordarOperador((String)((java_cup.runtime.Symbol)m).value,caright);
+                        semantico.crearOperacion();
                         RESULT = new Nodo("Contenido", new Nodo[]{(Nodo)o,n,(Nodo)ca});
                     :}
                     |
                     expresion:o MAYOR:m expresion:ca
                     {:
                         Nodo n=new Nodo((String)((java_cup.runtime.Symbol)m).value);
+                        semantico.recordarOperador((String)((java_cup.runtime.Symbol)m).value,caright);
+                        semantico.crearOperacion();
                         RESULT = new Nodo("Contenido", new Nodo[]{(Nodo)o,n,(Nodo)ca});
                     :}
                     |
                     expresion:o MENOR:m expresion:ca
                     {:
                         Nodo n=new Nodo((String)((java_cup.runtime.Symbol)m).value);
+                        semantico.recordarOperador((String)((java_cup.runtime.Symbol)m).value,caright);
+                        semantico.crearOperacion();
                         RESULT = new Nodo("Contenido", new Nodo[]{(Nodo)o,n,(Nodo)ca});
                     :}
                     |
                     PARENTESISIZQ:pi expresion:ca PARENTESISDER:pd
+                    {:
+                        Nodo n=new Nodo((String)((java_cup.runtime.Symbol)pi).value);
+                        Nodo n1=new Nodo((String)((java_cup.runtime.Symbol)pd).value);
+                        RESULT = new Nodo("Contenido", new Nodo[]{n, (Nodo)ca, n1});
+                    :}
+                    |
+                    PARENTESISIZQ:pi expresionBooleana:ca PARENTESISDER:pd
                     {:
                         Nodo n=new Nodo((String)((java_cup.runtime.Symbol)pi).value);
                         Nodo n1=new Nodo((String)((java_cup.runtime.Symbol)pd).value);
@@ -998,6 +1149,8 @@ objeto::=   asignacion:a
                 _ultimaLineaDerecha=((java_cup.runtime.Symbol)i).right;
                 _ultimaLineaIzquierda=((java_cup.runtime.Symbol)i).left;
                 Nodo n=new Nodo((String)((java_cup.runtime.Symbol)i).value);
+                semantico.recordarVariable(_ultimaLineaDerecha, (String)((java_cup.runtime.Symbol)i).value);
+                semantico.validaVariable();
                 RESULT = new Nodo("OBJETO", new Nodo[]{n});
             :}
             | LITERALINT:li
@@ -1005,6 +1158,7 @@ objeto::=   asignacion:a
                 _ultimaLineaDerecha=((java_cup.runtime.Symbol)li).right;
                 _ultimaLineaIzquierda=((java_cup.runtime.Symbol)li).left;
                 Nodo n=new Nodo((String)((java_cup.runtime.Symbol)li).value);
+                semantico.recordarLiteral(((java_cup.runtime.Symbol)li).value,_ultimaLineaDerecha,"int");
                 RESULT = new Nodo("OBJETO", new Nodo[]{n});
             :}
             | LITERALFLOAT:lf
@@ -1012,6 +1166,7 @@ objeto::=   asignacion:a
                 _ultimaLineaDerecha=((java_cup.runtime.Symbol)lf).right;
                 _ultimaLineaIzquierda=((java_cup.runtime.Symbol)lf).left;
                 Nodo n=new Nodo((String)((java_cup.runtime.Symbol)lf).value);
+                semantico.recordarLiteral(((java_cup.runtime.Symbol)lf).value,_ultimaLineaDerecha,"float");
                 RESULT = new Nodo("OBJETO", new Nodo[]{n});
             :}
             | LITERALSTRING:ls
@@ -1019,6 +1174,7 @@ objeto::=   asignacion:a
                 _ultimaLineaDerecha=((java_cup.runtime.Symbol)ls).right;
                 _ultimaLineaIzquierda=((java_cup.runtime.Symbol)ls).left;
                 Nodo n=new Nodo((String)((java_cup.runtime.Symbol)ls).value);
+                semantico.recordarLiteral(((java_cup.runtime.Symbol)ls).value,_ultimaLineaDerecha,"string");
                 RESULT = new Nodo("OBJETO", new Nodo[]{n});
             :}
             | LITERALCHAR:lc 
@@ -1026,6 +1182,7 @@ objeto::=   asignacion:a
                 _ultimaLineaDerecha=((java_cup.runtime.Symbol)lc).right;
                 _ultimaLineaIzquierda=((java_cup.runtime.Symbol)lc).left;
                 Nodo n=new Nodo((String)((java_cup.runtime.Symbol)lc).value);
+                semantico.recordarLiteral(((java_cup.runtime.Symbol)lc).value,_ultimaLineaDerecha,"char");
                 RESULT = new Nodo("OBJETO", new Nodo[]{n});
             :}
             | LITERALFALSE:lf
@@ -1033,6 +1190,7 @@ objeto::=   asignacion:a
                 _ultimaLineaDerecha=((java_cup.runtime.Symbol)lf).right;
                 _ultimaLineaIzquierda=((java_cup.runtime.Symbol)lf).left;
                 Nodo n=new Nodo((String)((java_cup.runtime.Symbol)lf).value);
+                semantico.recordarLiteral(((java_cup.runtime.Symbol)lf).value,_ultimaLineaDerecha,"boolean");
                 RESULT = new Nodo("OBJETO", new Nodo[]{n});
             :}
             | LITERALTRUE:lt
@@ -1040,10 +1198,12 @@ objeto::=   asignacion:a
                 _ultimaLineaDerecha=((java_cup.runtime.Symbol)lt).right;
                 _ultimaLineaIzquierda=((java_cup.runtime.Symbol)lt).left;
                 Nodo n=new Nodo((String)((java_cup.runtime.Symbol)lt).value);
+                semantico.recordarLiteral(((java_cup.runtime.Symbol)lt).value,_ultimaLineaDerecha,"boolean");
                 RESULT = new Nodo("OBJETO", new Nodo[]{n});
             :}
             | lista:l
             {:
+                semantico.recordarLista(_ultimaLineaDerecha);
                 RESULT = new Nodo("OBJETO", new Nodo[]{(Nodo)l});
             :}
             | llamadoFuncion:llf
@@ -1052,6 +1212,7 @@ objeto::=   asignacion:a
             :}
             | variableIndexada:vi
             {:
+                semantico.validaVariable();
                 RESULT = new Nodo("OBJETO", new Nodo[]{(Nodo)vi});
             :}
 ;
@@ -1080,6 +1241,7 @@ argumentosLista::= elementoLista:el
 
 elementoLista::= expresion:i
         {:
+            semantico.agregarLista();
             RESULT= new Nodo("Elemento de lista",new Nodo[]{(Nodo)i});
         :}
 ;
@@ -1087,6 +1249,7 @@ elementoLista::= expresion:i
 variableIndexada::= ID:i corcheteIndexado:ci
         {:
             Nodo id=new Nodo((String)((java_cup.runtime.Symbol)i).value);
+            semantico.recordarVariableIndexada(((java_cup.runtime.Symbol)i).right, (String)((java_cup.runtime.Symbol)i).value);
             RESULT= new Nodo("Variable con indice de una lista",new Nodo[]{id,(Nodo)ci});
         :}
         |ID:i error corcheteAux
@@ -1144,6 +1307,7 @@ llamadoFuncion::= ID:i PARENTESISIZQ:pi argumentosFuncion:af
             _ultimaLineaIzquierda=((java_cup.runtime.Symbol)i).left;
             Nodo id=new Nodo((String)((java_cup.runtime.Symbol)i).value);
             Nodo parI=new Nodo((String)((java_cup.runtime.Symbol)pi).value);
+            semantico.crearLlamdoFuncion((String)((java_cup.runtime.Symbol)i).value, _ultimaLineaDerecha);
             RESULT= new Nodo("FUNCION",new Nodo[]{id,parI,(Nodo)af});
         :}
         |
@@ -1154,6 +1318,7 @@ llamadoFuncion::= ID:i PARENTESISIZQ:pi argumentosFuncion:af
             Nodo id=new Nodo((String)((java_cup.runtime.Symbol)i).value);
             Nodo parI=new Nodo((String)((java_cup.runtime.Symbol)pi).value);
             Nodo parD=new Nodo((String)((java_cup.runtime.Symbol)pd).value);
+            semantico.crearLlamdoFuncion((String)((java_cup.runtime.Symbol)i).value, _ultimaLineaDerecha);
             RESULT= new Nodo("FUNCION.",new Nodo[]{id,parI,parD});
         :}
         |PRINT:i PARENTESISIZQ:pi argumentosFuncion:af
@@ -1255,11 +1420,13 @@ llamadoFuncion::= ID:i PARENTESISIZQ:pi argumentosFuncion:af
 argumentosFuncion::= expresion:oa PARENTESISDER:pd
         {:
             Nodo parD=new Nodo((String)((java_cup.runtime.Symbol)pd).value);
+            semantico.agregarArgumento();
             RESULT= new Nodo("ARGUMENTO",new Nodo[]{(Nodo)oa, parD});
         :}
         | expresion:oa COMA:c argumentosFuncion:af
         {:
             Nodo coma=new Nodo((String)((java_cup.runtime.Symbol)c).value);
+            semantico.agregarArgumento();
             RESULT= new Nodo("ARGUMENTO",new Nodo[]{(Nodo)oa,coma,(Nodo)af});
         :}
         | error
@@ -1274,6 +1441,9 @@ funcDef ::=
                 Nodo def=new Nodo((String)((java_cup.runtime.Symbol)d).value);
                 Nodo id= new Nodo((String)((java_cup.runtime.Symbol)i).value);
                 Nodo dosP=new Nodo((String)((java_cup.runtime.Symbol)dp).value);
+                semantico.quitarMarca();
+                semantico.recordarID((String)((java_cup.runtime.Symbol)i).value, ((java_cup.runtime.Symbol)i).right);
+                semantico.crearFuncion();
                 RESULT = new Nodo("FUNCDEF", new Nodo[]{(Nodo)def, id, (Nodo) p, dosP,(Nodo) dv, (Nodo)cf, (Nodo)pc});
             :}
             | DEF:d error DOSPUNTOS:dp variablesLocales:dv codigoFuncion:cf puntoComa:pc
@@ -1282,6 +1452,7 @@ funcDef ::=
                 Nodo id= new Nodo("Error en la declaracion de la función, en la línea:"+((java_cup.runtime.Symbol)d).right);
                 addError(id);
                 Nodo dosP=new Nodo((String)((java_cup.runtime.Symbol)dp).value);
+                semantico.quitarMarca();
                 RESULT = new Nodo("FUNCDEF", new Nodo[]{(Nodo)def, id, dosP,(Nodo) dv, (Nodo)cf, (Nodo)pc});
             :}
             | DEF:d DOSPUNTOS:dp puntoComa:pc
@@ -1324,6 +1495,7 @@ parametros  ::= PARENTESISIZQ:pi listaArg:la PARENTESISDER:pd
             {:
                 Nodo pizq=new Nodo((String)((java_cup.runtime.Symbol)pi).value);
                 Nodo pder=new Nodo((String)((java_cup.runtime.Symbol)pd).value);
+                semantico.agregarParametros();
                 RESULT = new Nodo("PARAMETROS", new Nodo[] {pizq, (Nodo) la, pder});
             :}
             |
@@ -1338,12 +1510,14 @@ parametros  ::= PARENTESISIZQ:pi listaArg:la PARENTESISDER:pd
 listaArg ::= tipo:t ID:i 
             {:
                 Nodo id= new Nodo((String)((java_cup.runtime.Symbol)i).value);
+                semantico.recordarID((String)((java_cup.runtime.Symbol)i).value, ((java_cup.runtime.Symbol)i).right);
                 RESULT = new Nodo("LISTARG",new Nodo[] {(Nodo)t, id});
             :}
             | tipo:t ID:i COMA:c listaArg:la
             {:
                 Nodo id= new Nodo((String)((java_cup.runtime.Symbol)i).value);
                 Nodo coma = new Nodo((String)((java_cup.runtime.Symbol)c).value);
+                semantico.recordarID((String)((java_cup.runtime.Symbol)i).value, ((java_cup.runtime.Symbol)i).right);
                 RESULT = new Nodo("LISTAARG",new Nodo[] {(Nodo)t, id,coma, (Nodo)la});
             :}
 ;
@@ -1352,6 +1526,7 @@ tipo ::= INT:i
                 _ultimaLineaDerecha=((java_cup.runtime.Symbol)i).right;
                 _ultimaLineaIzquierda=((java_cup.runtime.Symbol)i).left;
                 Nodo nodo= new Nodo((String)((java_cup.runtime.Symbol)i).value);
+                semantico.recordarTipo((String)((java_cup.runtime.Symbol)i).value, _ultimaLineaDerecha);
                 RESULT = new Nodo("TIPO",new Nodo[]{nodo});
             :}
         | LIST:l 
@@ -1359,6 +1534,7 @@ tipo ::= INT:i
                 _ultimaLineaDerecha=((java_cup.runtime.Symbol)l).right;
                 _ultimaLineaIzquierda=((java_cup.runtime.Symbol)l).left;
                 Nodo nodo= new Nodo((String)((java_cup.runtime.Symbol)l).value);
+                semantico.recordarTipo((String)((java_cup.runtime.Symbol)l).value, _ultimaLineaDerecha);
                 RESULT = new Nodo("TIPO",new Nodo[]{nodo});
             :}
         | FLOAT:f 
@@ -1366,6 +1542,7 @@ tipo ::= INT:i
                 _ultimaLineaDerecha=((java_cup.runtime.Symbol)f).right;
                 _ultimaLineaIzquierda=((java_cup.runtime.Symbol)f).left;
                 Nodo nodo= new Nodo((String)((java_cup.runtime.Symbol)f).value);
+                semantico.recordarTipo((String)((java_cup.runtime.Symbol)f).value, _ultimaLineaDerecha);
                 RESULT = new Nodo("TIPO",new Nodo[]{nodo});
             :}
         | STRING:s 
@@ -1373,6 +1550,7 @@ tipo ::= INT:i
                 _ultimaLineaDerecha=((java_cup.runtime.Symbol)s).right;
                 _ultimaLineaIzquierda=((java_cup.runtime.Symbol)s).left;
                 Nodo nodo= new Nodo((String)((java_cup.runtime.Symbol)s).value);
+                semantico.recordarTipo((String)((java_cup.runtime.Symbol)s).value, _ultimaLineaDerecha);
                 RESULT = new Nodo("TIPO",new Nodo[]{nodo});
             :}
         | BOOLEAN:b 
@@ -1380,6 +1558,7 @@ tipo ::= INT:i
                 _ultimaLineaDerecha=((java_cup.runtime.Symbol)b).right;
                 _ultimaLineaIzquierda=((java_cup.runtime.Symbol)b).left;
                 Nodo nodo= new Nodo((String)((java_cup.runtime.Symbol)b).value);
+                semantico.recordarTipo((String)((java_cup.runtime.Symbol)b).value, _ultimaLineaDerecha);
                 RESULT = new Nodo("TIPO",new Nodo[]{nodo});
             :}
         | CHAR:c 
@@ -1387,6 +1566,7 @@ tipo ::= INT:i
                 _ultimaLineaDerecha=((java_cup.runtime.Symbol)c).right;
                 _ultimaLineaIzquierda=((java_cup.runtime.Symbol)c).left;
                 Nodo nodo= new Nodo((String)((java_cup.runtime.Symbol)c).value);
+                semantico.recordarTipo((String)((java_cup.runtime.Symbol)c).value, _ultimaLineaDerecha);
                 RESULT = new Nodo("TIPO",new Nodo[]{nodo});
             :}
 ;

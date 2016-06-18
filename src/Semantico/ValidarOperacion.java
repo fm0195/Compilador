@@ -33,8 +33,8 @@ public class ValidarOperacion {
         operador2String.put("list", "boolean");
         
         operadoresString.put("==",operador2String);
-        operadoresString.put("AND",operador2String);
-        operadoresString.put("OR",operador2String);
+        operadoresString.put("and",operador2String);
+        operadoresString.put("or",operador2String);
         operadoresString.put("!=",operador2String);
         operadoresString.put("<>",operador2String);
         operadoresString.put(">=",operador2String);
@@ -68,8 +68,8 @@ public class ValidarOperacion {
         operador2Char.put("list", "boolean");
         
         operadoresChar.put("==",operador2Char);
-        operadoresChar.put("AND",operador2Char);
-        operadoresChar.put("OR",operador2Char);
+        operadoresChar.put("and",operador2Char);
+        operadoresChar.put("or",operador2Char);
         operadoresChar.put("!=",operador2Char);
         operadoresChar.put("<>",operador2Char);
         operadoresChar.put(">=",operador2Char);
@@ -102,8 +102,8 @@ public class ValidarOperacion {
         operador2List.put("list", "boolean");
         
         operadoresList.put("==",operador2List);
-        operadoresList.put("AND",operador2List);
-        operadoresList.put("OR",operador2List);
+        operadoresList.put("and",operador2List);
+        operadoresList.put("or",operador2List);
         operadoresList.put("!=",operador2List);
         operadoresList.put("<>",operador2List);
         operadoresList.put(">=",operador2List);
@@ -159,8 +159,8 @@ public class ValidarOperacion {
         operador2Boolean.put("list", "boolean");
         
         operadoresBoolean.put("==",operador2Boolean);
-        operadoresBoolean.put("AND",operador2Boolean);
-        operadoresBoolean.put("OR",operador2Boolean);
+        operadoresBoolean.put("and",operador2Boolean);
+        operadoresBoolean.put("or",operador2Boolean);
         operadoresBoolean.put("!=",operador2Boolean);
         operadoresBoolean.put("<>",operador2Boolean);
         operadoresBoolean.put(">=",operador2Boolean);
@@ -198,8 +198,8 @@ public class ValidarOperacion {
         operador2Float.put("list", "boolean");
         
         operadoresFloat.put("==",operador2Float);
-        operadoresFloat.put("AND",operador2Float);
-        operadoresFloat.put("OR",operador2Float);
+        operadoresFloat.put("and",operador2Float);
+        operadoresFloat.put("or",operador2Float);
         operadoresFloat.put("!=",operador2Float);
         operadoresFloat.put("<>",operador2Float);
         operadoresFloat.put(">=",operador2Float);
@@ -254,8 +254,8 @@ public class ValidarOperacion {
         operador2Int.put("list", "boolean");
         
         operadoresInt.put("==",operador2Int);
-        operadoresInt.put("AND",operador2Int);
-        operadoresInt.put("OR",operador2Int);
+        operadoresInt.put("and",operador2Int);
+        operadoresInt.put("or",operador2Int);
         operadoresInt.put("!=",operador2Int);
         operadoresInt.put("<>",operador2Int);
         operadoresInt.put(">=",operador2Int);
