@@ -135,8 +135,15 @@ public class Analizador {
             }
             Registro operacion;
             if (ValidarOperacion.getInstance().validarOp(valor1.getTipo(), operador.getValor(), valor2.getTipo())){
-                String tipo =ValidarOperacion.getInstance().getTipo(valor1.getTipo(), operador.getValor(), valor2.getTipo());
-                operacion = new RSOperacion(valor1, valor2, operador,valor1.getLinea(),tipo);
+                if(valor2 instanceof RSDataObject && operador.getValor()=="/" && 
+                       (((String)(((RSDataObject)valor2).getValor())).equals("0") |
+                        ((String)(((RSDataObject)valor2).getValor())).equals("0.0"))){
+                    operacion= new ErrorSemantico("division entre 0", valor1.getLinea());
+                    errores.add((ErrorSemantico)operacion);
+                }else{
+                    String tipo =ValidarOperacion.getInstance().getTipo(valor1.getTipo(), operador.getValor(), valor2.getTipo());
+                    operacion = new RSOperacion(valor1, valor2, operador,valor1.getLinea(),tipo);
+                }
             }else{
                 operacion= new ErrorSemantico("no se puede operar con \""+operador.getValor()+"\" los tipos: "+valor1.getTipo()+" y "+valor2.getTipo(), valor1.getLinea());
                 errores.add((ErrorSemantico)operacion);

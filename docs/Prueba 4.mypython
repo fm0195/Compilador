@@ -40,5 +40,6 @@ else:
 	s=9;
 d=d-9.2
 
-while x==2:
+while s==2:
+	s=0/0
 	break;
