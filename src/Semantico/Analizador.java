@@ -26,6 +26,7 @@ public class Analizador {
     public void recordarLiteral(Object literal, int linea, String tipo){
         RSDataObject objecto=new RSDataObject(linea, literal,tipo);
         pilaSemantica.push(objecto);
+        codigoPrincipal.add(objecto);
     }
     public void validaVariable(){
         if (!(pilaSemantica.peek()instanceof ErrorSemantico)){
@@ -49,6 +50,7 @@ public class Analizador {
                 String tipo = ((RSId)variablesGlobales.get(nombre)).getTipo();
                 RSVariable variable=new RSVariable(nombre,linea,tipo);
                 pilaSemantica.push(variable);
+                codigoPrincipal.add(variable);
         }else{
             ErrorSemantico e = new ErrorSemantico(" variable "+nombre+", no definida", linea);
             getErrores().add(e);
@@ -62,6 +64,7 @@ public class Analizador {
                     RegistroExpresion expresion =(RegistroExpresion) pilaSemantica.pop();
                     RSVariable variable=new RSVariable(nombre,true,expresion,linea,tipo);
                     pilaSemantica.push(variable);
+                    codigoPrincipal.add(variable);
                 }else{
                     ErrorSemantico e = new ErrorSemantico("Error, tipo "+tipo+", no es indexable", linea);
                     getErrores().add(e);
@@ -120,10 +123,16 @@ public class Analizador {
                 pilaSemantica.pop();
             }
             RegistroExpresion valor2=(RegistroExpresion)pilaSemantica.pop();
+            if(valor2 instanceof RSDataObject || valor2 instanceof RSVariable){
+                codigoPrincipal.remove(codigoPrincipal.size()-1);
+            }
             if (pilaSemantica.peek()==null){
                 pilaSemantica.pop();
             }
             RegistroExpresion valor1=(RegistroExpresion)pilaSemantica.pop();
+            if(valor1 instanceof RSDataObject || valor1 instanceof RSVariable){
+                codigoPrincipal.remove(codigoPrincipal.size()-1);
+            }
             Registro operacion;
             if (ValidarOperacion.getInstance().validarOp(valor1.getTipo(), operador.getValor(), valor2.getTipo())){
                 String tipo =ValidarOperacion.getInstance().getTipo(valor1.getTipo(), operador.getValor(), valor2.getTipo());
@@ -175,6 +184,7 @@ public class Analizador {
     public void agregarAsignacion(){
         if (!(pilaSemantica.peek() instanceof ErrorSemantico)){
             RSVariable var = (RSVariable)pilaSemantica.pop();
+            codigoPrincipal.remove(codigoPrincipal.size()-1);
             if (variablesGlobales.containsKey(var.getNombre())){
               if (!(pilaSemantica.peek() instanceof ErrorSemantico)){
                     if(autoAsignacion){
@@ -195,7 +205,11 @@ public class Analizador {
                         if (pilaSemantica.peek()==null){
                             pilaSemantica.pop();
                         }
-                        Registro asignacion= new RSAsignacion( pilaSemantica.pop(),var, var.getLinea());
+                        RegistroExpresion temp=(RegistroExpresion) pilaSemantica.pop();
+                        Registro asignacion= new RSAsignacion( temp,var, var.getLinea());
+                        if(temp instanceof RSDataObject || temp instanceof RSVariable){
+                            codigoPrincipal.remove(codigoPrincipal.size()-1);
+                        }
                         codigoPrincipal.add(asignacion);
                         pilaSemantica.push(asignacion);
                     }else{
@@ -242,6 +256,7 @@ public class Analizador {
                 parametrosFuncionTemp= new ArrayList<>();
                 variablesGlobales=new HashMap<>();
                 tempParametrosIncorrecta=false;
+                codigoPrincipal=new ArrayList<>();
                 funciones.put(nombre.getNombre(), funcion);
             }
         }else{
@@ -258,11 +273,7 @@ public class Analizador {
         return true;
     }
     private ArrayList<Registro> getCodigo(){
-        ArrayList<Registro> Resultado=new  ArrayList<>();
-        while (!pilaSemantica.isEmpty()) {
-            Resultado.add(pilaSemantica.pop());
-        }
-        return Resultado;
+        return codigoPrincipal;
     }
     public ArrayList<IImprimible> getErrores() {
         return errores;
@@ -302,34 +313,59 @@ public class Analizador {
             }
         }
     }
-    public void recordarIF(boolean pfinal,int linea, boolean isElse){
-        ArrayList<Registro> codigo=new ArrayList<>();
-        RSIf siguiente=null;
-        if (!pfinal){
-            siguiente=(RSIf)pilaSemantica.pop();
-        }
-        pilaSemantica.pop();
-        while(pilaSemantica.peek()!=null){ 
-            if(!(pilaSemantica.peek() instanceof ErrorSemantico)){
+    public void recordarIF(boolean pfinal,int linea, boolean isElse, boolean inicio){
+        if(!(pilaSemantica.peek() instanceof ErrorSemantico)){
+            ArrayList<Registro> codigo=new ArrayList<>();
+            RSIf siguiente=null;
+            if (!pfinal){
+                siguiente=(RSIf)pilaSemantica.pop();
                 codigoPrincipal.remove(codigoPrincipal.size()-1);
-                codigo.add(pilaSemantica.pop());
+            }
+            pilaSemantica.pop();
+            while(pilaSemantica.peek()!=null){ 
+                if(!(pilaSemantica.peek() instanceof ErrorSemantico)){
+                    codigoPrincipal.remove(codigoPrincipal.size()-1);
+                    codigo.add(0,pilaSemantica.pop());
+                }else{
+                    ErrorSemantico e = (ErrorSemantico) pilaSemantica.pop();
+                    limpiarPila();
+                    if(!isElse){
+                        pilaSemantica.pop();
+                        pilaSemantica.pop();
+                    }
+                    pilaSemantica.push(e);
+                    return;
+                }
+            }
+            RSIf rif =new RSIf(linea,codigo);
+            rif.setSiguienteIF(siguiente);
+            if(!isElse){
+                pilaSemantica.pop();
+                pilaSemantica.pop();
+            }
+            for (int counter=0; counter<pilaSemantica.size();counter++){
+                if (pilaSemantica.get(counter)==null){
+                    pilaSemantica.push(rif);
+                    codigoPrincipal.add(rif);
+                    return;
+                }
+            }
+            codigoPrincipal.add(rif);
+        }else{
+            limpiarPila();
+            if(!isElse){
+                pilaSemantica.pop();
+                pilaSemantica.pop();
             }
         }
-        pilaSemantica.pop();
-        RSIf rif =new RSIf(linea,codigo);
-        rif.setSiguienteIF(siguiente);
-        if(!isElse){
+    }
+    
+    public void limpiarPila(){
+        while(pilaSemantica.peek()!=null){
             pilaSemantica.pop();
         }
-        for (int counter=0; counter<pilaSemantica.size();counter++){
-            if (pilaSemantica.get(counter)==null){
-                pilaSemantica.push(rif);
-                codigoPrincipal.add(rif);
-                return;
-            }
-        }
-        codigoPrincipal.add(rif);
     }
+    
     public void marcaNull(){
         pilaSemantica.push(null);
     }

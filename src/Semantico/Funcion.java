@@ -13,7 +13,7 @@ public class Funcion {
 
     public Funcion(RSId nombre,ArrayList<RSId> parametros,HashMap<String,RSId> variablesLocales,
                     ArrayList<Registro> codigo ) {
-        this.nombre = this.nombre;
+        this.nombre = nombre;
         this.parametros=parametros;
         this.variablesLocales=variablesLocales;
         this.codigo=codigo;
@@ -24,4 +24,13 @@ public class Funcion {
     public boolean validaparametro(int numero, RegistroExpresion param){
         return parametros.get(numero).getTipo()==param.getTipo();
     }
+
+    public ArrayList<RSId> getVariablesLocales() {
+      return new ArrayList<>(variablesLocales.values());
+    }
+
+    public ArrayList<Registro> getCodigo() {
+        return codigo;
+    }
+    
 }

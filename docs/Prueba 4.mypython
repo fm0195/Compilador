@@ -1,10 +1,44 @@
+def g():
+	int s,p,a
+list t
+float d
+s=0
+if (s and s) or (s and 2):
+	s=9
+	d=87.0
+	if s==0:
+		d=34.8;
+	else:
+		s=0;
+	;
+elif s==4:
+	s=0;
+else:
+	d=9.8
+	s=9;
+
+if s==0:
+	s;
+;
+
 int s,p,a
 list t
 float d
 s=1+6+9
 if (s and s) or (s and 2):
 	s=9
-	d=87.0;
+	d=87.0
+	if s==0:
+		d=34.8;
+	else:
+		s=0;
+	;
+elif s==4:
+	s=0;
 else:
 	d=9.8
 	s=9;
+d=d-9.2
+
+while x==2:
+	break;

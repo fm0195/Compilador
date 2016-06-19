@@ -13,6 +13,7 @@ public class GeneradorCodigo {
     private StringBuffer codigoBuffer;
     private String path;
     private HashMap<String, String> hashVariables;
+    private int labelCounter;
 
   public GeneradorCodigo(String path) {
     int index;
@@ -28,6 +29,23 @@ public class GeneradorCodigo {
     for (RSId variable : variables) {
       String nombreCodigo = variable.getNombre();
       String nombreAsm = "var_"+nombreCodigo;
+      String linea = "\t"+nombreAsm + " " + tipoDato(variable.getTipo()) + " " + "0\n";
+      variablesBuffer.append(linea);
+      hashVariables.put(nombreCodigo, nombreAsm);
+    }
+  }
+  public void generarFunciones(ArrayList<Funcion> funciones){
+    hashVariables = new HashMap<>();
+    for (Funcion funcion : funciones) {
+      generarVariablesLocales(funcion.getVariablesLocales(), hashVariables);
+      generarCodigo(funcion.getCodigo());
+    }
+  }
+  private void generarVariablesLocales(ArrayList<RSId> variables, HashMap<String, String> hashVariables)
+  {
+    for (RSId variable : variables) {
+      String nombreCodigo = variable.getNombre();
+      String nombreAsm = "var_fun_"+nombreCodigo;
       String linea = "\t"+nombreAsm + " " + tipoDato(variable.getTipo()) + " " + "0\n";
       variablesBuffer.append(linea);
       hashVariables.put(nombreCodigo, nombreAsm);
@@ -62,6 +80,39 @@ public class GeneradorCodigo {
         String codigo = variablesBuffer.toString()+codigoBuffer.toString();
         ManagerFile managerFile = new ManagerFile();
         managerFile.createFile(path, codigo);
+    }
+
+    private void generarCodigo(ArrayList<Registro> codigo) {
+        for (Registro exp : codigo) {
+            if (exp instanceof RSIf) {
+                //codigo del if
+            }
+            if (exp instanceof RSAsignacion) {
+                RSAsignacion asignacion = (RSAsignacion) exp;
+                generarExpresion(asignacion.getExpresion());
+                String variableCodigo = hashVariables.get(asignacion.getId());
+                codigoBuffer.append("mov ").append(variableCodigo).append(", R8\n");
+            }
+        }
+    }
+
+    private void generarExpresion(Registro expresion) {
+        if (expresion instanceof RSVariable) {
+            RSVariable variable = (RSVariable) expresion;
+            String res;
+            String variableCodigo = hashVariables.get(variable.getNombre());
+            codigoBuffer.append("mov R8,").append(variableCodigo).append("\n");
+        }
+        if (expresion instanceof RSDataObject) {
+            RSDataObject variable = (RSDataObject) expresion;
+            String res="";
+            if ("float".equals(variable.getTipo())) {
+                res += "fld "+variable.getValor()+"\n";
+                res += "";
+            }else{
+                
+            }
+        }
     }
     
     

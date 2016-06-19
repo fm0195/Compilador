@@ -683,7 +683,7 @@ elseIf::= ELIF:ei expresionBooleana:eb DOSPUNTOS:dp codigoFuncion:c puntoComa:pc
         {:
             Nodo whl=new Nodo((String)((java_cup.runtime.Symbol)e).value);
             Nodo dosPuntos=new Nodo((String)((java_cup.runtime.Symbol)dp).value);
-            semantico.recordarIF(true,((java_cup.runtime.Symbol)e).right,false);
+            semantico.recordarIF(true,((java_cup.runtime.Symbol)e).right,true);
             RESULT = new Nodo("ELSE",new Nodo[]{whl, dosPuntos,(Nodo) c, (Nodo)pc});
         :}
         | ELIF:ei error DOSPUNTOS:dp codigoFuncion:c puntoComa:pc elseIf:ei1
@@ -703,15 +703,6 @@ elseIf::= ELIF:ei expresionBooleana:eb DOSPUNTOS:dp codigoFuncion:c puntoComa:pc
             Nodo dosPuntos=new Nodo("Error en la definicion del Elif, en la linea: "+((java_cup.runtime.Symbol)ei).right);
             addError(dosPuntos);
             RESULT = new Nodo("ELIF",new Nodo[]{whl, dosPuntos, (Nodo)pc,(Nodo)ei1});
-        :}
-        | ELSE:e DOSPUNTOS:dp codigoFuncion:c puntoComa:pc
-        {:
-            _ultimaLineaDerecha=((java_cup.runtime.Symbol)e).right;
-            _ultimaLineaIzquierda=((java_cup.runtime.Symbol)e).left;
-            Nodo whl=new Nodo((String)((java_cup.runtime.Symbol)e).value);
-            Nodo dosPuntos=new Nodo((String)((java_cup.runtime.Symbol)dp).value);
-            semantico.recordarIF(true,((java_cup.runtime.Symbol)e).right,true);
-            RESULT = new Nodo("ELSE",new Nodo[]{whl, dosPuntos,(Nodo) c, (Nodo)pc});
         :}
         | ELSE:e error puntoComa:pc
         {:
