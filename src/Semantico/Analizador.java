@@ -352,11 +352,13 @@ public class Analizador {
             }
             for (int counter=0; counter<pilaSemantica.size();counter++){
                 if (pilaSemantica.get(counter)==null){
+                    rif.setIsElse(isElse);
                     pilaSemantica.push(rif);
                     codigoPrincipal.add(rif);
                     return;
                 }
             }
+            rif.setIsElse(isElse);
             codigoPrincipal.add(rif);
         }else{
             limpiarPila();

@@ -13,7 +13,7 @@ public class GeneradorCodigo {
     private StringBuffer codigoBuffer;
     private String path;
     private HashMap<String, String> hashVariables;
-    private int labelCounter;
+    private int labelCounter=0;
     private int tempCounter=1;
 
   public GeneradorCodigo(String path) {
@@ -22,6 +22,11 @@ public class GeneradorCodigo {
     this.path = path.substring(0, index)+".asm";
     variablesBuffer = new StringBuffer("section .data\n");
     codigoBuffer = new StringBuffer("section .text\n\tglobal _start\n_start:\n");
+  }
+  private String generarLabelIF(){
+      String label = "Label-IF-ELSE"+labelCounter;
+      labelCounter++;
+      return label;
   }
   
   public void generarVariablesGlobales(ArrayList<RSId> variables)
@@ -86,7 +91,7 @@ public class GeneradorCodigo {
     public void generarCodigo(ArrayList<Registro> codigo) {
         for (Registro exp : codigo) {
             if (exp instanceof RSIf) {
-                //codigo del if
+                generarIF((RSIf)exp);
             }
             if (exp instanceof RSAsignacion) {
                 RSAsignacion asignacion = (RSAsignacion) exp;
@@ -224,5 +229,31 @@ public class GeneradorCodigo {
         }
         return res;
     }
+    
+    private void generarIF(RSIf actual){
+        String etiqueta= generarLabelIF();
+        String etiquetaSalida=generarLabelIF();
+        String etiquetaSiguiente="";
+        while(actual!=null){            
+            codigoBuffer.append(etiqueta+":\n");
+            etiqueta= generarLabelIF();
+            if(!actual.isIsElse()){
+                etiquetaSiguiente=generarLabelIF();
+                codigoBuffer.append(";operaciones para obtener el valor boleano");
+                codigoBuffer.append("\n\t;cmp eax, resultadoBooleano\n");
+                codigoBuffer.append("\tje "+etiqueta+"\n");
+                codigoBuffer.append("\tjne "+etiquetaSiguiente+"\n");
+                codigoBuffer.append(etiqueta+":\n");
+            }
+            generarCodigo(actual.getCodigo());
+            if(!actual.isIsElse()){
+                codigoBuffer.append("\tjmp "+etiquetaSalida+"\n");
+            }
+            etiqueta=etiquetaSiguiente;
+            actual=actual.getSiguienteIF();
+        }
+        codigoBuffer.append(etiquetaSalida+":\n");
+    }
+    
 }
     
