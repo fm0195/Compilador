@@ -13,5 +13,19 @@ public class RSOperacion extends RegistroExpresion{
         this.valor2 = valor2;
         this.operador = operador;
     }
+
+    public Registro getValor1() {
+        return valor1;
+    }
+
+    public Registro getValor2() {
+        return valor2;
+    }
+
+    public String getOperador() {
+        return operador.getValor();
+    }
+    
+    
     
 }

@@ -2226,7 +2226,9 @@ public class Parser extends java_cup.runtime.lr_parser {
                 erroresSintacticos().size()==0
                 && erroresSemanticos().size()==0){
             GeneradorCodigo generador = new GeneradorCodigo(path);
+            generador.generarFunciones(semantico.getFunciones());
             generador.generarVariablesGlobales(semantico.getVariablesGlobales());
+            generador.generarCodigo(semantico.getCodigoPrincipal());
             generador.generateAsmFile();
         }
     }
