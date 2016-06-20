@@ -22,7 +22,7 @@ public class Funcion {
         return parametros.size();
     }
     public boolean validaparametro(int numero, RegistroExpresion param){
-        return parametros.get(numero).getTipo()==param.getTipo();
+        return parametros.get(parametros.size()-1-numero).getTipo().equals(param.getTipo());
     }
 
     public ArrayList<RSId> getVariablesLocales() {
@@ -32,5 +32,19 @@ public class Funcion {
     public ArrayList<Registro> getCodigo() {
         return codigo;
     }
-    
+    public String toString(){
+        ArrayList<RSId> variables=getVariablesLocales();
+        String res = "FUNCIÓN\n";
+        res+="PARÁMETROS:\n";
+        for (RSId parametro : parametros) {
+            res+=parametro.toString();
+        }
+        res+="------------------------------------------------------------------------\n";
+        res+="VARIABLES LOCALES\n";
+        for (RSId variable : variables) {
+            res+=variable.toString();
+        }
+        res+="------------------------------------------------------------------------\n";
+        return res;
+    }
 }

@@ -29,4 +29,13 @@ public class RSId extends Registro{
     public void setAsignada() {
         this.isAsignada = true;
     }
+    public String toString(){
+        String res="Variable\n";
+        res+="Nombre: "+nombre+"\n";
+        res+="Tipo: "+tipo+"\n";
+        res+="Línea: "+linea+"\n";
+        res+="Fue asignada: "+isAsignada+"\n";
+        res+="-----------------------------------------------------------------\n";
+        return res;
+    }
 }

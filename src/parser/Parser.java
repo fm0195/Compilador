@@ -2211,6 +2211,9 @@ public class Parser extends java_cup.runtime.lr_parser {
     private void addError(IImprimible nodo){
         errores.add(nodo);
     }
+    public String getTabla(){
+        return semantico.getTablaSimbolos();
+    }
     public ArrayList<IImprimible> erroresSintacticos(){
         return errores;
     }

@@ -1,10 +1,24 @@
+def hola(int x,string r,float f):
+	int i,x
+	string f,o
+	float p,z
+	list n,m
+	char wq,q
+	x="dd"
+	x+=3;
+
 int i,x
+string e,o
+float p,z
+list n,m
+char wq,q
 x=0
 i=0
-if i==0:
-	i=(1+6*42)*(3+4)/5;
+if i==0 and x==0:
+	i=(1+6*42)*(3+4)//5
+	hola(5,"",5.0);
 else:
-	if x==9:
+	if x==9 or jo==9:
 		i=9;
 	elif x==8:
 		i=0;

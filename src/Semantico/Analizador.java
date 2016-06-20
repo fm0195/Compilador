@@ -51,6 +51,17 @@ public class Analizador {
                 RSVariable variable=new RSVariable(nombre,linea,tipo);
                 pilaSemantica.push(variable);
                 codigoPrincipal.add(variable);
+        }else if(!validaParametro(nombre)){
+                String tipo="";
+                for(RSId param :parametrosFuncionTemp){
+                    if(param.getNombre().equals(nombre)){
+                        tipo=param.getTipo();
+                        break;
+                    }
+                }
+                RSVariable variable=new RSVariable(nombre,linea,tipo);
+                pilaSemantica.push(variable);
+                codigoPrincipal.add(variable);
         }else{
             ErrorSemantico e = new ErrorSemantico(" variable "+nombre+", no definida", linea);
             getErrores().add(e);
@@ -60,6 +71,24 @@ public class Analizador {
     public void recordarVariableIndexada(int linea, String nombre){
         if (variablesGlobales.containsKey(nombre)){
                 String tipo = ((RSId)variablesGlobales.get(nombre)).getTipo();
+                if (ValidarOperacion.getInstance().isIndexable(tipo)){
+                    RegistroExpresion expresion =(RegistroExpresion) pilaSemantica.pop();
+                    RSVariable variable=new RSVariable(nombre,true,expresion,linea,tipo);
+                    pilaSemantica.push(variable);
+                    codigoPrincipal.add(variable);
+                }else{
+                    ErrorSemantico e = new ErrorSemantico("Error, tipo "+tipo+", no es indexable", linea);
+                    getErrores().add(e);
+                    pilaSemantica.push(e);
+                }
+        }else if(!validaParametro(nombre)){
+                String tipo="";
+                for(RSId param :parametrosFuncionTemp){
+                    if(param.getNombre().equals(nombre)){
+                        tipo=param.getTipo();
+                        break;
+                    }
+                }
                 if (ValidarOperacion.getInstance().isIndexable(tipo)){
                     RegistroExpresion expresion =(RegistroExpresion) pilaSemantica.pop();
                     RSVariable variable=new RSVariable(nombre,true,expresion,linea,tipo);
@@ -204,10 +233,11 @@ public class Analizador {
                             ErrorSemantico e = new ErrorSemantico(" variable "+var.getNombre()+", no asignada", var.getLinea());
                             getErrores().add(e);
                             pilaSemantica.push(e);
+                            autoAsignacion=false;
                             return;
                         }
                     }
-                    if (variablesGlobales.get(var.getNombre()).getTipo()==((RegistroExpresion)pilaSemantica.peek()).getTipo()){
+                    if (variablesGlobales.get(var.getNombre()).getTipo().equals(((RegistroExpresion)pilaSemantica.peek()).getTipo())){
                         variablesGlobales.get(var.getNombre()).setAsignada();
                         if (pilaSemantica.peek()==null){
                             pilaSemantica.pop();
@@ -226,6 +256,55 @@ public class Analizador {
                         pilaSemantica.push(e);
                     }
               }
+            }else if (!validaParametro(var.getNombre())){
+                  if (!(pilaSemantica.peek() instanceof ErrorSemantico)){
+                        if(autoAsignacion){
+                            boolean asignada=false;
+                            for(RSId param :parametrosFuncionTemp){
+                                if(param.getNombre().equals(var.getNombre())){
+                                    asignada=param.isIsAsignada();
+                                    break;
+                                }
+                            }                            
+                            if (asignada){
+                                pilaSemantica.push(var);
+                                pilaSemantica.push(tempAutoOperador);
+                                autoAsignacion=false;
+                                crearOperacion();
+                             }else{
+                                ErrorSemantico e = new ErrorSemantico(" variable "+var.getNombre()+", no asignada", var.getLinea());
+                                getErrores().add(e);
+                                pilaSemantica.push(e);
+                                autoAsignacion=false;
+                                return;
+                            }
+                        }
+                        RSId parametro=null;
+                        for(RSId param :parametrosFuncionTemp){
+                                if(param.getNombre().equals(var.getNombre())){
+                                    parametro=param;
+                                    break;
+                                }
+                            }
+                        if (parametro.getTipo().equals(((RegistroExpresion)pilaSemantica.peek()).getTipo())){
+                            parametro.setAsignada();
+                            if (pilaSemantica.peek()==null){
+                                pilaSemantica.pop();
+                            }
+                            RegistroExpresion temp=(RegistroExpresion) pilaSemantica.pop();
+                            Registro asignacion= new RSAsignacion( temp,var, var.getLinea());
+                            if(temp instanceof RSDataObject || temp instanceof RSVariable){
+                                codigoPrincipal.remove(codigoPrincipal.size()-1);
+                            }
+                            codigoPrincipal.add(asignacion);
+                            pilaSemantica.push(asignacion);
+                        }else{
+                            ErrorSemantico e = new ErrorSemantico(" variable "+var.getNombre()+", tipo: "+parametro.getTipo()+
+                                                        ", no puede ser asignada con un tipo: "+((RegistroExpresion)pilaSemantica.peek()).getTipo(), var.getLinea());
+                            getErrores().add(e);
+                            pilaSemantica.push(e);
+                        }
+                  }
             }else{
                 ErrorSemantico e = new ErrorSemantico(" variable "+var.getNombre()+", no definida", var.linea);
                 getErrores().add(e);
@@ -244,7 +323,7 @@ public class Analizador {
         while(!pilaSemantica.isEmpty()){
             RSId id= (RSId)pilaSemantica.pop();
             if (validaParametro(id.getNombre())) {
-                RSTipo tipo= buscarTipoParametro();
+                RSTipo tipo= (RSTipo)pilaSemantica.remove(0);
                 id.setTipo(tipo.getNombre());
                 parametrosFuncionTemp.add(id);
             }else{
@@ -258,6 +337,13 @@ public class Analizador {
     public void crearFuncion(){
         RSId nombre =(RSId) pilaSemantica.pop();
         if(!(funciones.containsKey(nombre.getNombre()))){
+            for (RSId id : parametrosFuncionTemp) {
+                if(variablesGlobales.containsKey(id.getNombre())){
+                    ErrorSemantico e = new ErrorSemantico(" variable "+id.getNombre()+" local, ya definida como parámetro", 
+                            variablesGlobales.get(id.getNombre()).linea);
+                    getErrores().add(e);
+                }
+            }
             if (!tempParametrosIncorrecta){
                 Funcion funcion = new Funcion(nombre, parametrosFuncionTemp, variablesGlobales,getCodigo());
                 parametrosFuncionTemp= new ArrayList<>();
@@ -265,6 +351,7 @@ public class Analizador {
                 tempParametrosIncorrecta=false;
                 codigoPrincipal=new ArrayList<>();
                 funciones.put(nombre.getNombre(), funcion);
+                pilaSemantica.removeAllElements();
             }
         }else{
             ErrorSemantico e = new ErrorSemantico(" función "+nombre.getNombre()+", ya definida", nombre.linea);
@@ -398,7 +485,19 @@ public class Analizador {
     public ArrayList<Registro> getCodigoPrincipal() {
         return codigoPrincipal;
     }
-    
+    public String getTablaSimbolos(){
+        String res ="TABLA DE SÍMBOLOS\n";
+        ArrayList<Funcion> funciones =getFunciones();
+        for (Funcion funcion : funciones) {
+            res+=funcion.toString();
+        }
+        ArrayList<RSId> variables=getVariablesGlobales();
+        res+="VARIABLES GLOBALES\n";
+        for (RSId variable : variables) {
+            res+=variable.toString();
+        }
+        return res;
+    }
     private ArrayList<Registro> tempLista= new ArrayList();
     private boolean autoAsignacion= false;
     private boolean tempParametrosIncorrecta= false;

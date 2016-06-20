@@ -6,17 +6,19 @@ section .data
 	temp3 dw 0
 	temp4 dw 0
 	temp5 dw 0
+	temp6 dw 0
+	temp7 dw 0
+	temp8 dw 0
+	temp9 dw 0
 section .text
 	global _start
 _start:
+	mov eax,3
+	add eax,null
+	mov temp1,eax
+	mov null, temp1
 	mov var_x, 0
 	mov var_i, 0
-Label-IF-ELSE0:
-;operaciones para obtener el valor boleano
-	;cmp eax, resultadoBooleano
-	je Label-IF-ELSE2
-	jne Label-IF-ELSE3
-Label-IF-ELSE2:
 	mov eax,3
 	add eax,4
 	mov temp3,eax
@@ -33,6 +35,28 @@ Label-IF-ELSE2:
 	idiv 5
 	mov temp1,eax
 	mov var_i, temp1
+Label-IF-ELSE0:
+;operaciones para obtener el valor boleano
+	;cmp eax, resultadoBooleano
+	je Label-IF-ELSE2
+	jne Label-IF-ELSE3
+Label-IF-ELSE2:
+	mov eax,3
+	add eax,4
+	mov temp7,eax
+	mov eax,6
+	imul eax,42
+	mov temp8,eax
+	mov eax,1
+	add eax,temp8
+	mov temp6,eax
+	mov eax,temp6
+	imul eax,temp7
+	mov temp5,eax
+	mov eax,temp5
+	idiv 5
+	mov temp5,eax
+	mov var_i, temp5
 	jmp Label-IF-ELSE1
 Label-IF-ELSE3:
 Label-IF-ELSE5:
@@ -54,15 +78,15 @@ Label-IF-ELSE9:
 Label-IF-ELSE10:
 	mov eax,8
 	add eax,9
-	mov temp5,eax
-	mov var_x, temp5
+	mov temp9,eax
+	mov var_x, temp9
 Label-IF-ELSE6:
 	mov var_i, 8
 Label-IF-ELSE1:
 	mov eax,8
 	imul eax,9
-	mov temp5,eax
-	mov eax,temp5
+	mov temp9,eax
+	mov eax,temp9
 	add eax,6
-	mov temp5,eax
-	mov var_i, temp5
+	mov temp9,eax
+	mov var_i, temp9
