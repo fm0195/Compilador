@@ -47,4 +47,7 @@ public class Funcion {
         res+="------------------------------------------------------------------------\n";
         return res;
     }
+    public String getNombre(){
+        return nombre.getNombre();
+    }
 }

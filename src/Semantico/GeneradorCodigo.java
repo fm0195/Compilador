@@ -21,7 +21,7 @@ public class GeneradorCodigo {
     index = path.lastIndexOf(".");
     this.path = path.substring(0, index)+".asm";
     variablesBuffer = new StringBuffer("section .data\n");
-    codigoBuffer = new StringBuffer("section .text\n\tglobal _start\n_start:\n");
+    codigoBuffer = new StringBuffer("section .text\n\tglobal _start\n");
   }
   private String generarLabelIF(){
       String label = "Label-IF-ELSE"+labelCounter;
@@ -42,10 +42,13 @@ public class GeneradorCodigo {
   }
   public void generarFunciones(ArrayList<Funcion> funciones){
     for (Funcion funcion : funciones) {
+      codigoBuffer.append(funcion.getNombre()+":\n");
       hashVariables = new HashMap<>();
       generarVariablesLocales(funcion.getVariablesLocales(), hashVariables);
       generarCodigo(funcion.getCodigo());
+      codigoBuffer.append("ret\n");
     }
+    codigoBuffer.append("_start:\n");
   }
   private void generarVariablesLocales(ArrayList<RSId> variables, HashMap<String, String> hashVariables)
   {

@@ -268,6 +268,7 @@ public class Analizador {
                             }                            
                             if (asignada){
                                 pilaSemantica.push(var);
+                                codigoPrincipal.add(var);
                                 pilaSemantica.push(tempAutoOperador);
                                 autoAsignacion=false;
                                 crearOperacion();

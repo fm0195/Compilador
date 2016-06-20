@@ -1185,7 +1185,7 @@ public class MyPythonScanner implements Scanner {
             }
           case 156: break;
           case 48: 
-            { return new OperatorToken("*=",yyline,sym.MULT);
+            { return new OperatorToken("*=",yyline,sym.MULTIGUAL);
             }
           case 157: break;
           case 49: 
