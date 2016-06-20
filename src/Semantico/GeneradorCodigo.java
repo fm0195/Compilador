@@ -20,7 +20,7 @@ public class GeneradorCodigo {
     int index;
     index = path.lastIndexOf(".");
     this.path = path.substring(0, index)+".asm";
-    variablesBuffer = new StringBuffer("section .data\n");
+    variablesBuffer = new StringBuffer("section .data\n\ttemp_float dd 0\n");
     codigoBuffer = new StringBuffer("section .text\n\tglobal _start\n");
   }
   private String generarLabelIF(){
@@ -31,7 +31,6 @@ public class GeneradorCodigo {
   
   public void generarVariablesGlobales(ArrayList<RSId> variables)
   {
-    hashVariables = new HashMap<>();
     for (RSId variable : variables) {
       String nombreCodigo = variable.getNombre();
       String nombreAsm = "var_"+nombreCodigo;
@@ -41,20 +40,32 @@ public class GeneradorCodigo {
     }
   }
   public void generarFunciones(ArrayList<Funcion> funciones){
+    hashVariables = new HashMap<>();
     for (Funcion funcion : funciones) {
       codigoBuffer.append(funcion.getNombre()+":\n");
-      hashVariables = new HashMap<>();
-      generarVariablesLocales(funcion.getVariablesLocales(), hashVariables);
+      generarParametros(funcion.getParametros(), funcion.getNombre());
+      generarVariablesLocales(funcion.getVariablesLocales(), funcion.getNombre());
       generarCodigo(funcion.getCodigo());
       codigoBuffer.append("\tret\n");
     }
+    hashVariables.clear();
     codigoBuffer.append("_start:\n");
   }
-  private void generarVariablesLocales(ArrayList<RSId> variables, HashMap<String, String> hashVariables)
+  private void generarVariablesLocales(ArrayList<RSId> variables, String nombreFuncion)
   {
     for (RSId variable : variables) {
       String nombreCodigo = variable.getNombre();
-      String nombreAsm = "var_fun_"+nombreCodigo;
+      String nombreAsm = "var_fun_"+nombreFuncion+"_"+nombreCodigo;
+      String linea = "\t"+nombreAsm + " " + tipoDato(variable.getTipo()) + " " + "0\n";
+      variablesBuffer.append(linea);
+      hashVariables.put(nombreCodigo, nombreAsm);
+    }
+  }
+  private void generarParametros(ArrayList<RSId> parametros, String nombreFuncion)
+  {
+    for (RSId variable : parametros) {
+      String nombreCodigo = variable.getNombre();
+      String nombreAsm = "par_fun_"+nombreFuncion+"_"+nombreCodigo;
       String linea = "\t"+nombreAsm + " " + tipoDato(variable.getTipo()) + " " + "0\n";
       variablesBuffer.append(linea);
       hashVariables.put(nombreCodigo, nombreAsm);
@@ -103,7 +114,7 @@ public class GeneradorCodigo {
                 if (expresion instanceof RSDataObject) {
                     RSDataObject literal = (RSDataObject) expresion;
                     String res="";
-                    switch(literal.getTipo()){
+                    switch(asignacion.getTipo()){
                         case "int":
                             res += "\tmov "+variable+", "+literal.getValor()+"\n";
                             break;
@@ -124,17 +135,23 @@ public class GeneradorCodigo {
                 }
                 else if (expresion instanceof RSOperacion){
                     int i = tempCounter;
-                    if (asignacion.getTipo().equals("int")) {
-                        String res="";
-                        res += revertir(generarExpresionEntero(expresion, "temp"+tempCounter));
-                        res+="\tmov "+variable+", "+"temp"+i+"\n";
-                        codigoBuffer.append(res);
-                    }
-                    else if (asignacion.getTipo().equals("float")) {
-                        String res="";
-                        res += generarExpresionFlotante(expresion, "temp"+tempCounter);
-                        res += "\tfstp "+variable+"\n";
-                        codigoBuffer.append(res);
+                    switch (asignacion.getTipo()) {
+                        case "int":
+                            {
+                                String res="";
+                                res += revertir(generarExpresionEntero(expresion, "temp"+tempCounter));
+                                res+="\tmov "+variable+", "+"temp"+i+"\n";
+                                codigoBuffer.append(res);
+                                break;
+                            }
+                        case "float":
+                            {
+                                String res="";
+                                res += revertir(generarExpresionFlotante(expresion, "temp"+tempCounter));
+                                res+="\tmov "+variable+", "+"temp"+i+"\n";
+                                codigoBuffer.append(res);
+                                break;
+                            }
                     }
                 }
             }
@@ -178,7 +195,40 @@ public class GeneradorCodigo {
         return res;
     }
     private String generarExpresionFlotante(Registro expresion, String destino) {
-        return null;
+        String res="";
+        RSOperacion operacion = (RSOperacion) expresion;
+        if (esTerminal(operacion.getValor1()) && esTerminal(operacion.getValor2())) {
+            int dest = tempCounter;
+            res += "\tmov "+destino+",eax\n";
+            Registro v1 = operacion.getValor1();
+            Registro v2 = operacion.getValor2();
+            String valor1 = v1 instanceof RSDataObject ? (String)((RSDataObject)v1).getValor() : hashVariables.get(((RSVariable)v1).getNombre());
+            String valor2 = v2 instanceof RSDataObject ? (String)((RSDataObject)v2).getValor() : hashVariables.get(((RSVariable)v2).getNombre());
+            res += generarCodigoOperacionFlotante(valor1, valor2, operacion.getOperador());
+        } else if (esTerminal(operacion.getValor1()) && !esTerminal(operacion.getValor2())) {
+            int dest = tempCounter;
+            agregarVariableTemporal("dw");
+            res += "\tmov "+destino+",eax\n";
+            Registro v1 = operacion.getValor1();
+            String valor1 = v1 instanceof RSDataObject ? (String)((RSDataObject)v1).getValor() : hashVariables.get(((RSVariable)v1).getNombre());
+            res += generarCodigoOperacionFlotante(valor1, "temp"+dest, operacion.getOperador())+generarExpresionFlotante(operacion.getValor2(), "temp"+dest);
+        }
+        else if (!esTerminal(operacion.getValor1()) && esTerminal(operacion.getValor2())) {
+            int dest = tempCounter;
+            agregarVariableTemporal("dw");
+            res += "\tmov "+destino+",eax\n";
+            Registro v2 = operacion.getValor2();
+            String valor2 = v2 instanceof RSDataObject ? (String)((RSDataObject)v2).getValor() : hashVariables.get(((RSVariable)v2).getNombre());
+            res += generarCodigoOperacionFlotante("temp"+dest, valor2, operacion.getOperador())+generarExpresionFlotante(operacion.getValor1(), "temp"+dest);
+        }
+        else if (!esTerminal(operacion.getValor1()) && !esTerminal(operacion.getValor2())) {
+            int dest = tempCounter;
+            agregarVariableTemporal("dw");
+            agregarVariableTemporal("dw");
+            res += "\tmov "+destino+",eax\n";
+            res += generarCodigoOperacionFlotante("temp"+dest, "temp"+(dest+1), operacion.getOperador())+generarExpresionFlotante(operacion.getValor1(), "temp"+dest)+generarExpresionEntero(operacion.getValor2(), "temp"+(dest+1));
+        }
+        return res;
     }
     
     private boolean esTerminal(Registro op)
@@ -223,6 +273,46 @@ public class GeneradorCodigo {
         }
         return res;
     }
+    private String generarCodigoOperacionFlotante(String valor1, String valor2, String operador) {
+        String res="";
+        switch(operador)
+        {
+            case "+":
+                res+="\tmov eax,temp_float\n";
+                res+="\tfstp temp_float\n";
+                res+="\tfadd "+valor2+"\n";
+                res+="\tfld "+valor1+"\n";
+                break;
+            case "-":
+                res+="\tmov eax,temp_float\n";
+                res+="\tfstp temp_float\n";
+                res+="\tfsub "+valor2+"\n";
+                res+="\tfld "+valor1+"\n";
+                break;
+            case "*":
+                res+="\tmov eax,temp_float\n";
+                res+="\tfstp temp_float\n";
+                res+="\tfmul "+valor2+"\n";
+                res+="\tfld "+valor1+"\n";
+                break;
+            case "/":
+                res+="\tmov eax,temp_float\n";
+                res+="\tfstp temp_float\n";
+                res+="\tfdiv "+valor2+"\n";
+                res+="\tfld "+valor1+"\n";
+                break;
+            case "//":
+                res+="\tidiv "+valor2+"\n";
+                res+="\tmov eax,"+valor1+"\n";
+                break;
+            case "%":
+                res+="\tmov eax, edx\n";
+                res+="\tidiv "+valor2+"\n";
+                res+="\tmov eax,"+valor1+"\n";
+                break;
+        }
+        return res;
+    }
 
     private String revertir(String string) {
         String[] parts=string.split("\n");
@@ -241,7 +331,7 @@ public class GeneradorCodigo {
             codigoBuffer.append(etiqueta+":\n");
             etiqueta= generarLabelIF();
             if(!actual.isIsElse()){
-                codigoBuffer.append(";operaciones para obtener el valor boleano");
+                codigoBuffer.append("\t;operaciones para obtener el valor boleano");
                 codigoBuffer.append("\n\t;cmp eax, resultadoBooleano\n");
                 codigoBuffer.append("\tje "+etiqueta+"\n");
                 if(actual.getSiguienteIF()==null){

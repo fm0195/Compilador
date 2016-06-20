@@ -50,4 +50,8 @@ public class Funcion {
     public String getNombre(){
         return nombre.getNombre();
     }
+
+    public ArrayList<RSId> getParametros() {
+        return parametros;
+    }
 }
