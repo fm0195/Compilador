@@ -157,16 +157,12 @@ public class Analizador {
                 pilaSemantica.pop();
             }
             RegistroExpresion valor2=(RegistroExpresion)pilaSemantica.pop();
-            if(valor2 instanceof RSDataObject || valor2 instanceof RSVariable){
-                codigoPrincipal.remove(codigoPrincipal.size()-1);
-            }
+            codigoPrincipal.remove(codigoPrincipal.size()-1);
             if (pilaSemantica.peek()==null){
                 pilaSemantica.pop();
             }
             RegistroExpresion valor1=(RegistroExpresion)pilaSemantica.pop();
-            if(valor1 instanceof RSDataObject || valor1 instanceof RSVariable){
-                codigoPrincipal.remove(codigoPrincipal.size()-1);
-            }
+            codigoPrincipal.remove(codigoPrincipal.size()-1);
             Registro operacion;
             if (ValidarOperacion.getInstance().validarOp(valor1.getTipo(), operador.getValor(), valor2.getTipo())){
                 if(valor2 instanceof RSDataObject && operador.getValor()=="/" && 
@@ -183,6 +179,7 @@ public class Analizador {
                 errores.add((ErrorSemantico)operacion);
             }
             pilaSemantica.push(operacion);
+            codigoPrincipal.add(operacion);
         }
     }
  
@@ -250,9 +247,7 @@ public class Analizador {
                         }
                         RegistroExpresion temp=(RegistroExpresion) pilaSemantica.pop();
                         Registro asignacion= new RSAsignacion( temp,var, var.getLinea());
-                        if(temp instanceof RSDataObject || temp instanceof RSVariable){
-                            codigoPrincipal.remove(codigoPrincipal.size()-1);
-                        }
+                        codigoPrincipal.remove(codigoPrincipal.size()-1);
                         codigoPrincipal.add(asignacion);
                         pilaSemantica.push(asignacion);
                     }else{
@@ -264,27 +259,12 @@ public class Analizador {
               }
             }else if (!validaParametro(var.getNombre())){
                   if (!(pilaSemantica.peek() instanceof ErrorSemantico)){
-                        if(autoAsignacion){
-                            boolean asignada=false;
-                            for(RSId param :parametrosFuncionTemp){
-                                if(param.getNombre().equals(var.getNombre())){
-                                    asignada=param.isIsAsignada();
-                                    break;
-                                }
-                            }                            
-                            if (asignada){
+                        if(autoAsignacion){       
                                 pilaSemantica.push(var);
                                 codigoPrincipal.add(var);
                                 pilaSemantica.push(tempAutoOperador);
                                 autoAsignacion=false;
                                 crearOperacion();
-                             }else{
-                                ErrorSemantico e = new ErrorSemantico(" variable "+var.getNombre()+", no asignada", var.getLinea());
-                                getErrores().add(e);
-                                pilaSemantica.push(e);
-                                autoAsignacion=false;
-                                return;
-                            }
                         }
                         RSId parametro=null;
                         for(RSId param :parametrosFuncionTemp){
@@ -300,9 +280,7 @@ public class Analizador {
                             }
                             RegistroExpresion temp=(RegistroExpresion) pilaSemantica.pop();
                             Registro asignacion= new RSAsignacion( temp,var, var.getLinea());
-                            if(temp instanceof RSDataObject || temp instanceof RSVariable){
-                                codigoPrincipal.remove(codigoPrincipal.size()-1);
-                            }
+                            codigoPrincipal.remove(codigoPrincipal.size()-1);
                             codigoPrincipal.add(asignacion);
                             pilaSemantica.push(asignacion);
                         }else{
@@ -381,6 +359,7 @@ public class Analizador {
     }
     public void agregarArgumento(){
         RegistroExpresion expresion=(RegistroExpresion)pilaSemantica.pop();
+        codigoPrincipal.remove(codigoPrincipal.size()-1);
         argumentoTempLLamadoFuncion.add(expresion);
     }
     public void crearLlamdoFuncion(String nombre, int linea){
@@ -442,6 +421,7 @@ public class Analizador {
             rif.setSiguienteIF(siguiente);
             if(!isElse){
                 pilaSemantica.pop();
+                codigoPrincipal.remove(codigoPrincipal.size()-1);
                 pilaSemantica.pop();
             }
             for (int counter=0; counter<pilaSemantica.size();counter++){

@@ -46,7 +46,7 @@ public class GeneradorCodigo {
       hashVariables = new HashMap<>();
       generarVariablesLocales(funcion.getVariablesLocales(), hashVariables);
       generarCodigo(funcion.getCodigo());
-      codigoBuffer.append("ret\n");
+      codigoBuffer.append("\tret\n");
     }
     codigoBuffer.append("_start:\n");
   }
@@ -241,11 +241,15 @@ public class GeneradorCodigo {
             codigoBuffer.append(etiqueta+":\n");
             etiqueta= generarLabelIF();
             if(!actual.isIsElse()){
-                etiquetaSiguiente=generarLabelIF();
                 codigoBuffer.append(";operaciones para obtener el valor boleano");
                 codigoBuffer.append("\n\t;cmp eax, resultadoBooleano\n");
                 codigoBuffer.append("\tje "+etiqueta+"\n");
-                codigoBuffer.append("\tjne "+etiquetaSiguiente+"\n");
+                if(actual.getSiguienteIF()==null){
+                    codigoBuffer.append("\tjne "+etiquetaSalida+"\n");
+                }else{
+                    etiquetaSiguiente=generarLabelIF();
+                    codigoBuffer.append("\tjne "+etiquetaSiguiente+"\n");
+                }
                 codigoBuffer.append(etiqueta+":\n");
             }
             generarCodigo(actual.getCodigo());
