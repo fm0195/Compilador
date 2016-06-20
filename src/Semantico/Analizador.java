@@ -141,7 +141,7 @@ public class Analizador {
        return null;
     }
     private RSTipo buscarTipoParametro(){
-       for(int contador=pilaSemantica.size()-1;contador>=0;contador--){
+       for(int contador=0;contador<pilaSemantica.size();contador++){
            if(pilaSemantica.get(contador) instanceof RSTipo){
                return (RSTipo)pilaSemantica.remove(contador);
            }
@@ -273,7 +273,7 @@ public class Analizador {
                                     break;
                                 }
                             }
-                        if (parametro.getTipo().equals(((RegistroExpresion)pilaSemantica.peek()).getTipo())){
+                        if (ValidarOperacion.getInstance().isAssignable(parametro.getTipo(),(((RegistroExpresion)pilaSemantica.peek()).getTipo()))){
                             parametro.setAsignada();
                             if (pilaSemantica.peek()==null){
                                 pilaSemantica.pop();
@@ -305,18 +305,22 @@ public class Analizador {
         }
     }
     public void agregarParametros(){
-        while(!pilaSemantica.isEmpty()){
-            RSId id= (RSId)pilaSemantica.pop();
-            if (validaParametro(id.getNombre())) {
-                RSTipo tipo= (RSTipo)pilaSemantica.remove(0);
-                id.setTipo(tipo.getNombre());
-                parametrosFuncionTemp.add(id);
-            }else{
-                tempParametrosIncorrecta=true;
-                ErrorSemantico e = new ErrorSemantico(" parametro "+id.getNombre()+", ya definido", id.linea);
-                getErrores().add(e);
-                pilaSemantica.pop();
+        if(parametrosFuncionTemp.size()==0){
+            while(!pilaSemantica.isEmpty()){
+                RSId id= (RSId)pilaSemantica.pop();
+                if (validaParametro(id.getNombre())) {
+                    RSTipo tipo= buscarTipoParametro();
+                    id.setTipo(tipo.getNombre());
+                    parametrosFuncionTemp.add(id);
+                }else{
+                    tempParametrosIncorrecta=true;
+                    ErrorSemantico e = new ErrorSemantico(" parametro "+id.getNombre()+", ya definido", id.linea);
+                    getErrores().add(e);
+                    pilaSemantica.pop();
+                }
             }
+        }else{
+            pilaSemantica.removeAllElements();
         }
     }
     public void crearFuncion(){
@@ -334,14 +338,15 @@ public class Analizador {
                 parametrosFuncionTemp= new ArrayList<>();
                 variablesGlobales=new HashMap<>();
                 tempParametrosIncorrecta=false;
-                codigoPrincipal=new ArrayList<>();
                 funciones.put(nombre.getNombre(), funcion);
-                pilaSemantica.removeAllElements();
+                
             }
         }else{
             ErrorSemantico e = new ErrorSemantico(" función "+nombre.getNombre()+", ya definida", nombre.linea);
             getErrores().add(e);
         }
+        pilaSemantica.removeAllElements();
+        codigoPrincipal=new ArrayList<>();
     }
     private boolean validaParametro(String id){
         for (RSId paraId : parametrosFuncionTemp) {

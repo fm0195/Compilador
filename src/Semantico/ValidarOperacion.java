@@ -10,6 +10,7 @@ public class ValidarOperacion {
     }
     private HashMap<String, HashMap<String,HashMap<String, HashMap<String, String>>>> MapaTiposOperadores=new HashMap<>();
     private HashMap<String,Boolean> indexable = new HashMap<>();
+    private HashMap<String,HashMap<String,Boolean>> asignacion = new HashMap<>();
     private static ValidarOperacion instance=new ValidarOperacion();
     private  ValidarOperacion(){
         /*String*/
@@ -276,9 +277,36 @@ public class ValidarOperacion {
         MapaTiposOperadores.put("float", floatType);
         MapaTiposOperadores.put("int", intType);
         
-        indexable.put("String",true);
+        indexable.put("string",true);
         indexable.put("list",true);
         
+        HashMap<String,Boolean> asignBool=new HashMap<>();
+        asignBool.put("boolean", true);
+        asignacion.put("boolean", asignBool);
+        
+        HashMap<String,Boolean> asignStr=new HashMap<>();
+        asignStr.put("char", true);
+        asignStr.put("string", true);
+        asignacion.put("string", asignStr);
+        
+        HashMap<String,Boolean> asignchar=new HashMap<>();
+        asignchar.put("char", true);
+        asignacion.put("char", asignchar);
+        
+        HashMap<String,Boolean> asignList=new HashMap<>();
+        asignList.put("list", true);
+        asignacion.put("list", asignList);
+        
+        HashMap<String,Boolean> asignInt=new HashMap<>();
+        asignInt.put("int", true);
+        asignInt.put("boolean", true);
+        asignacion.put("int", asignInt);
+        
+        HashMap<String,Boolean> asignFloat=new HashMap<>();
+        asignFloat.put("int", true);
+        asignFloat.put("boolean", true);
+        asignFloat.put("float", true);
+        asignacion.put("float", asignFloat);
     }
     public boolean validarOp(String valor1, String operador, String valor2){
         HashMap<String,HashMap<String,HashMap<String, String>>> type= MapaTiposOperadores.get(valor1);
@@ -293,5 +321,8 @@ public class ValidarOperacion {
     }
     public boolean isIndexable(String tipo){
         return indexable.containsKey(tipo);
+    }
+    public boolean isAssignable(String tipo1, String tipo2){
+        return asignacion.get(tipo1).containsKey(tipo2);
     }
 }

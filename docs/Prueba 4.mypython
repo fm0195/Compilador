@@ -5,7 +5,7 @@ def hola(int x,string r,float f):
 	char wq,q
 	x=2+9+8+63/8
 	if x==0:
-	x+=3;;
+	f+=3/8;;
 
 def pow(int x, int y):
 	if x==0:

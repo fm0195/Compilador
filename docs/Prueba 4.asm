@@ -80,10 +80,7 @@ Label-IF-ELSE5:
 	je Label-IF-ELSE7
 	jne Label-IF-ELSE6
 Label-IF-ELSE7:
-	mov eax,3
-	add eax,null
-	mov temp5,eax
-	mov null, temp5
+null	fstp null
 	jmp Label-IF-ELSE6
 Label-IF-ELSE6:
 	ret
