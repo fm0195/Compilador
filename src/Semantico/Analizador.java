@@ -31,7 +31,12 @@ public class Analizador {
     public void validaVariable(){
         if (!(pilaSemantica.peek()instanceof ErrorSemantico)){
             String nombre=((RSVariable)pilaSemantica.peek()).getNombre();
-            if (!(variablesGlobales.get(nombre).isIsAsignada())){
+            if((variablesGlobales.containsKey(nombre))&&!(variablesGlobales.get(nombre).isIsAsignada())){
+                ErrorSemantico e = new ErrorSemantico("variable "+nombre+", no asignada", ((RSVariable)pilaSemantica.peek()).getLinea());
+                getErrores().add(e);
+                pilaSemantica.pop();
+                pilaSemantica.push(e);
+            }else if (!(variablesGlobales.containsKey(nombre))&&validaParametro(nombre)){
                 ErrorSemantico e = new ErrorSemantico("variable "+nombre+", no asignada", ((RSVariable)pilaSemantica.peek()).getLinea());
                 getErrores().add(e);
                 pilaSemantica.pop();
@@ -226,6 +231,7 @@ public class Analizador {
                     if(autoAsignacion){
                         if (variablesGlobales.get(var.getNombre()).isIsAsignada()){
                             pilaSemantica.push(var);
+                            codigoPrincipal.add(var);
                             pilaSemantica.push(tempAutoOperador);
                             autoAsignacion=false;
                             crearOperacion();
