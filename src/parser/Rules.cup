@@ -1134,6 +1134,13 @@ expresion::=        expresion:o MAS:m expresion:ca
                     addError(new Nodo("Error en la expresion, en la línea: "+_ultimaLineaDerecha));
                         RESULT = new Nodo("Error en la expresion, en la línea: "+_ultimaLineaDerecha);
                     :}
+                    |
+                    MENOS:m expresion:ca
+                    {:
+                        Nodo n=new Nodo((String)((java_cup.runtime.Symbol)m).value);
+                        semantico.expressionNegativa();
+                        RESULT = new Nodo("Contenido", new Nodo[]{n,(Nodo)ca});
+                    :}%prec PARENTESISIZQ
 ;
 objeto::=   asignacion:a 
             {:

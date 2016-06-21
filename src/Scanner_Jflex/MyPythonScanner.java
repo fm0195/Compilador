@@ -1261,7 +1261,7 @@ public class MyPythonScanner implements Scanner {
             }
           case 175: break;
           case 67: 
-            { yybegin(YYINITIAL); return new CharToken("\'"+yytext(),yyline, sym.CHAR);
+            { yybegin(YYINITIAL); return new CharToken("\'"+yytext(),yyline, sym.LITERALCHAR);
             }
           case 176: break;
           case 68: 

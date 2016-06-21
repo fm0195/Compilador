@@ -114,10 +114,12 @@ public class Analizador {
     public void recordarLista(int linea){
         RSDataObject lista= new RSDataObject(linea,tempLista,"list");
         pilaSemantica.add(lista);
+        codigoPrincipal.add(lista);
         tempLista= new ArrayList<>();
     }
     public void agregarLista(){
         Registro elemento = pilaSemantica.pop();
+        codigoPrincipal.remove(codigoPrincipal.size()-1);
         tempLista.add(elemento);
     }
     public void recordarOperador(String valor, int linea){
@@ -398,7 +400,7 @@ public class Analizador {
             }
         }
     }
-    public void recordarIF(boolean pfinal,int linea, boolean isElse, boolean inicio){
+    public void recordarIF(boolean pfinal,int linea, boolean isElse){
         if(!(pilaSemantica.peek() instanceof ErrorSemantico)){
             ArrayList<Registro> codigo=new ArrayList<>();
             RSIf siguiente=null;
@@ -490,6 +492,22 @@ public class Analizador {
         }
         return res;
     }
+    public void expressionNegativa(){
+        if (!(pilaSemantica.peek()instanceof ErrorSemantico)){
+            RegistroExpresion exp = (RegistroExpresion)pilaSemantica.pop();
+            if(exp.getTipo().equals("string")
+                || exp.getTipo().equals("int")
+                || exp.getTipo().equals("float")){
+                exp.negative();
+                pilaSemantica.push(exp);
+            }
+            else{
+                ErrorSemantico e = new ErrorSemantico(" expresion no puede ser negativa, tipo "+exp.getTipo(),exp.linea);
+                getErrores().add(e);
+            }
+        }
+    }
+    
     private ArrayList<Registro> tempLista= new ArrayList();
     private boolean autoAsignacion= false;
     private boolean tempParametrosIncorrecta= false;

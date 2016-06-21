@@ -12,7 +12,7 @@ public class GeneradorCodigo {
     private StringBuffer variablesBuffer;
     private StringBuffer codigoBuffer;
     private String path;
-    private HashMap<String, String> hashVariables;
+    private HashMap<String, String> hashVariables=new HashMap<>();
     private int labelCounter=0;
     private int tempCounter=1;
 
@@ -41,15 +41,17 @@ public class GeneradorCodigo {
   }
   public void generarFunciones(ArrayList<Funcion> funciones){
     hashVariables = new HashMap<>();
-    for (Funcion funcion : funciones) {
-      codigoBuffer.append(funcion.getNombre()+":\n");
-      generarParametros(funcion.getParametros(), funcion.getNombre());
-      generarVariablesLocales(funcion.getVariablesLocales(), funcion.getNombre());
-      generarCodigo(funcion.getCodigo());
-      codigoBuffer.append("\tret\n");
+    if (funciones!=null){
+        for (Funcion funcion : funciones) {
+          codigoBuffer.append(funcion.getNombre()+":\n");
+          generarParametros(funcion.getParametros(), funcion.getNombre());
+          generarVariablesLocales(funcion.getVariablesLocales(), funcion.getNombre());
+          generarCodigo(funcion.getCodigo());
+          codigoBuffer.append("\tret\n");
+        }
+        hashVariables.clear();
+        codigoBuffer.append("_start:\n");
     }
-    hashVariables.clear();
-    codigoBuffer.append("_start:\n");
   }
   private void generarVariablesLocales(ArrayList<RSId> variables, String nombreFuncion)
   {
