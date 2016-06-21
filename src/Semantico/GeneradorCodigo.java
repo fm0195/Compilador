@@ -22,6 +22,7 @@ public class GeneradorCodigo {
     this.path = path.substring(0, index)+".asm";
     variablesBuffer = new StringBuffer("section .data\n\ttemp_float dd 0\n");
     codigoBuffer = new StringBuffer("section .text\n\tglobal _start\n");
+    tempCounter--;
   }
   private String generarLabelIF(){
       String label = "Label-IF-ELSE"+labelCounter;
@@ -118,11 +119,14 @@ public class GeneradorCodigo {
                     String res="";
                     switch(asignacion.getTipo()){
                         case "int":
-                            res += "\tmov "+variable+", "+literal.getValor()+"\n";
+                            res +="\tmov eax,"+literal.getValor()+"\n";
+                            res += literal.isNegative() ? "\tneg eax\n" : "";
+                            res += "\tmov ["+variable+"], eax\n";
                             break;
                         case "float":
                             res+="\tfld "+literal.getValor()+"\n";
-                            res+="\tfstp "+variable+"\n";
+                            res+="\tfstp ["+variable+"]\n";
+                            res += literal.isNegative() ? "\tmov eax,"+"["+variable+"]"+"\n\tneg eax\n" +"\tmov ["+variable+"],eax\n": "";
                             break;
                     }
                     codigoBuffer.append(res);
@@ -131,8 +135,9 @@ public class GeneradorCodigo {
                     RSVariable literal = (RSVariable) expresion;
                     String variableCodigo = hashVariables.get(literal.getNombre());
                     String res="";
-                    res +="\tmov eax"+", "+variableCodigo+"\n";
-                    res +="\tmov "+variable+", eax\n";
+                    res +="\tmov eax"+", ["+variableCodigo+"]\n";
+                    res += literal.isNegative() ? "\tneg eax\n" : "";
+                    res +="\tmov ["+variable+"], eax\n";
                     codigoBuffer.append(res);
                 }
                 else if (expresion instanceof RSOperacion){
@@ -141,16 +146,18 @@ public class GeneradorCodigo {
                         case "int":
                             {
                                 String res="";
-                                res += revertir(generarExpresionEntero(expresion, "temp"+tempCounter));
-                                res+="\tmov "+variable+", "+"temp"+i+"\n";
+                                res += revertir(generarExpresionEntero(expresion, "[temp"+tempCounter+"]"));
+                                res += "\tmov eax, [temp"+i+"]\n";
+                                res += "\tmov ["+variable+"], eax";
                                 codigoBuffer.append(res);
                                 break;
                             }
                         case "float":
                             {
                                 String res="";
-                                res += revertir(generarExpresionFlotante(expresion, "temp"+tempCounter));
-                                res+="\tmov "+variable+", "+"temp"+i+"\n";
+                                res += revertir(generarExpresionFlotante(expresion, "[temp"+tempCounter+"]"));
+                                res += "\tmov eax, [temp"+i+"]\n";
+                                res += "\tmov ["+variable+"], eax";
                                 codigoBuffer.append(res);
                                 break;
                             }
@@ -164,35 +171,36 @@ public class GeneradorCodigo {
         String res="";
         RSOperacion operacion = (RSOperacion) expresion;
         if (esTerminal(operacion.getValor1()) && esTerminal(operacion.getValor2())) {
-            int dest = tempCounter;
-            res += "\tmov "+destino+",eax\n";
-            Registro v1 = operacion.getValor1();
-            Registro v2 = operacion.getValor2();
-            String valor1 = v1 instanceof RSDataObject ? (String)((RSDataObject)v1).getValor() : hashVariables.get(((RSVariable)v1).getNombre());
-            String valor2 = v2 instanceof RSDataObject ? (String)((RSDataObject)v2).getValor() : hashVariables.get(((RSVariable)v2).getNombre());
-            res += generarCodigoOperacionEntera(valor1, valor2, operacion.getOperador());
-        } else if (esTerminal(operacion.getValor1()) && !esTerminal(operacion.getValor2())) {
-            int dest = tempCounter;
             agregarVariableTemporal("dw");
             res += "\tmov "+destino+",eax\n";
+            res += operacion.isNegative() ? "\tneg eax\n" : "";
             Registro v1 = operacion.getValor1();
-            String valor1 = v1 instanceof RSDataObject ? (String)((RSDataObject)v1).getValor() : hashVariables.get(((RSVariable)v1).getNombre());
-            res += generarCodigoOperacionEntera(valor1, "temp"+dest, operacion.getOperador())+generarExpresionEntero(operacion.getValor2(), "temp"+dest);
+            Registro v2 = operacion.getValor2();
+            String valor1 = v1 instanceof RSDataObject ? (String)((RSDataObject)v1).getValor() : "["+hashVariables.get(((RSVariable)v1).getNombre())+"]";
+            String valor2 = v2 instanceof RSDataObject ? (String)((RSDataObject)v2).getValor() : "["+hashVariables.get(((RSVariable)v2).getNombre())+"]";
+            res += generarCodigoOperacionEntera(valor1, v1.isNegative(), valor2, v2.isNegative(), operacion.getOperador());
+        } else if (esTerminal(operacion.getValor1()) && !esTerminal(operacion.getValor2())) {
+            agregarVariableTemporal("dw");
+            res += "\tmov "+destino+",eax\n";
+            res += operacion.isNegative() ? "\tneg eax\n" : "";
+            Registro v1 = operacion.getValor1();
+            String valor1 = v1 instanceof RSDataObject ? (String)((RSDataObject)v1).getValor() : "["+hashVariables.get(((RSVariable)v1).getNombre())+"]";
+            res += generarCodigoOperacionEntera(valor1, v1.isNegative(), "[temp"+tempCounter+"]",false, operacion.getOperador())+generarExpresionEntero(operacion.getValor2(), "[temp"+tempCounter+"]");
         }
         else if (!esTerminal(operacion.getValor1()) && esTerminal(operacion.getValor2())) {
-            int dest = tempCounter;
             agregarVariableTemporal("dw");
             res += "\tmov "+destino+",eax\n";
+            res += operacion.isNegative() ? "\tneg eax\n" : "";
             Registro v2 = operacion.getValor2();
-            String valor2 = v2 instanceof RSDataObject ? (String)((RSDataObject)v2).getValor() : hashVariables.get(((RSVariable)v2).getNombre());
-            res += generarCodigoOperacionEntera("temp"+dest, valor2, operacion.getOperador())+generarExpresionEntero(operacion.getValor1(), "temp"+dest);
+            String valor2 = v2 instanceof RSDataObject ? (String)((RSDataObject)v2).getValor() : "["+hashVariables.get(((RSVariable)v2).getNombre())+"]";
+            res += generarCodigoOperacionEntera("[temp"+tempCounter+"]", false,valor2, v2.isNegative(), operacion.getOperador())+generarExpresionEntero(operacion.getValor1(), "[temp"+tempCounter+"]");
         }
         else if (!esTerminal(operacion.getValor1()) && !esTerminal(operacion.getValor2())) {
-            int dest = tempCounter;
             agregarVariableTemporal("dw");
             agregarVariableTemporal("dw");
             res += "\tmov "+destino+",eax\n";
-            res += generarCodigoOperacionEntera("temp"+dest, "temp"+(dest+1), operacion.getOperador())+generarExpresionEntero(operacion.getValor1(), "temp"+dest)+generarExpresionEntero(operacion.getValor2(), "temp"+(dest+1));
+            res += operacion.isNegative() ? "\tneg eax\n" : "";
+            res += generarCodigoOperacionEntera("[temp"+tempCounter+"]",false, "[temp"+(tempCounter+1)+"]", false, operacion.getOperador())+generarExpresionEntero(operacion.getValor1(), "[temp"+tempCounter+"]")+generarExpresionEntero(operacion.getValor2(), "[temp"+(tempCounter+1)+"]");
         }
         return res;
     }
@@ -200,35 +208,36 @@ public class GeneradorCodigo {
         String res="";
         RSOperacion operacion = (RSOperacion) expresion;
         if (esTerminal(operacion.getValor1()) && esTerminal(operacion.getValor2())) {
-            int dest = tempCounter;
-            res += "\tmov "+destino+",eax\n";
-            Registro v1 = operacion.getValor1();
-            Registro v2 = operacion.getValor2();
-            String valor1 = v1 instanceof RSDataObject ? (String)((RSDataObject)v1).getValor() : hashVariables.get(((RSVariable)v1).getNombre());
-            String valor2 = v2 instanceof RSDataObject ? (String)((RSDataObject)v2).getValor() : hashVariables.get(((RSVariable)v2).getNombre());
-            res += generarCodigoOperacionFlotante(valor1, valor2, operacion.getOperador());
-        } else if (esTerminal(operacion.getValor1()) && !esTerminal(operacion.getValor2())) {
-            int dest = tempCounter;
             agregarVariableTemporal("dw");
             res += "\tmov "+destino+",eax\n";
+            res += operacion.isNegative() ? "\tneg eax\n" : "";
             Registro v1 = operacion.getValor1();
-            String valor1 = v1 instanceof RSDataObject ? (String)((RSDataObject)v1).getValor() : hashVariables.get(((RSVariable)v1).getNombre());
-            res += generarCodigoOperacionFlotante(valor1, "temp"+dest, operacion.getOperador())+generarExpresionFlotante(operacion.getValor2(), "temp"+dest);
+            Registro v2 = operacion.getValor2();
+            String valor1 = v1 instanceof RSDataObject ? (String)((RSDataObject)v1).getValor() : "["+hashVariables.get(((RSVariable)v1).getNombre())+"]";
+            String valor2 = v2 instanceof RSDataObject ? (String)((RSDataObject)v2).getValor() : "["+hashVariables.get(((RSVariable)v2).getNombre())+"]";
+            res += generarCodigoOperacionFlotante(valor1, v1.isNegative(), valor2, v2.isNegative(), operacion.getOperador());
+        } else if (esTerminal(operacion.getValor1()) && !esTerminal(operacion.getValor2())) {
+            agregarVariableTemporal("dw");
+            res += "\tmov "+destino+",eax\n";
+            res += operacion.isNegative() ? "\tneg eax\n" : "";
+            Registro v1 = operacion.getValor1();
+            String valor1 = v1 instanceof RSDataObject ? (String)((RSDataObject)v1).getValor() : "["+hashVariables.get(((RSVariable)v1).getNombre())+"]";
+            res += generarCodigoOperacionFlotante(valor1, v1.isNegative(), "[temp"+tempCounter+"]",false, operacion.getOperador())+generarExpresionFlotante(operacion.getValor2(), "[temp"+tempCounter+"]");
         }
         else if (!esTerminal(operacion.getValor1()) && esTerminal(operacion.getValor2())) {
-            int dest = tempCounter;
             agregarVariableTemporal("dw");
             res += "\tmov "+destino+",eax\n";
+            res += operacion.isNegative() ? "\tneg eax\n" : "";
             Registro v2 = operacion.getValor2();
-            String valor2 = v2 instanceof RSDataObject ? (String)((RSDataObject)v2).getValor() : hashVariables.get(((RSVariable)v2).getNombre());
-            res += generarCodigoOperacionFlotante("temp"+dest, valor2, operacion.getOperador())+generarExpresionFlotante(operacion.getValor1(), "temp"+dest);
+            String valor2 = v2 instanceof RSDataObject ? (String)((RSDataObject)v2).getValor() : "["+hashVariables.get(((RSVariable)v2).getNombre())+"]";
+            res += generarCodigoOperacionFlotante("[temp"+tempCounter+"]", false,valor2, v2.isNegative(), operacion.getOperador())+generarExpresionFlotante(operacion.getValor1(), "[temp"+tempCounter+"]");
         }
         else if (!esTerminal(operacion.getValor1()) && !esTerminal(operacion.getValor2())) {
-            int dest = tempCounter;
             agregarVariableTemporal("dw");
             agregarVariableTemporal("dw");
             res += "\tmov "+destino+",eax\n";
-            res += generarCodigoOperacionFlotante("temp"+dest, "temp"+(dest+1), operacion.getOperador())+generarExpresionFlotante(operacion.getValor1(), "temp"+dest)+generarExpresionEntero(operacion.getValor2(), "temp"+(dest+1));
+            res += operacion.isNegative() ? "\tneg eax\n" : "";
+            res += generarCodigoOperacionFlotante("[temp"+tempCounter+"]",false, "[temp"+(tempCounter+1)+"]", false, operacion.getOperador())+generarExpresionFlotante(operacion.getValor1(), "[temp"+tempCounter+"]")+generarExpresionFlotante(operacion.getValor2(), "[temp"+(tempCounter+1)+"]");
         }
         return res;
     }
@@ -243,73 +252,101 @@ public class GeneradorCodigo {
         variablesBuffer.append(res);
     }
 
-    private String generarCodigoOperacionEntera(String valor1, String valor2, String operador) {
+    private String generarCodigoOperacionEntera(String valor1, boolean neg1, String valor2, boolean neg2, String operador) {
         String res="";
         switch(operador)
         {
             case "+":
-                res+="\tadd eax,"+valor2+"\n";
+                res+="\tadd eax,ebx\n";
+                res += neg2 ? "\tneg ebx\n" : "";
+                res += neg1 ? "\tneg eax\n" : "";
+                res += "\tmov ebx,"+valor2+"\n";
                 res+="\tmov eax,"+valor1+"\n";
                 break;
             case "-":
-                res+="\tsub eax,"+valor2+"\n";
+                res+="\tsub eax,ebx\n";
+                res += neg2 ? "\tneg ebx\n" : "";
+                res += neg1 ? "\tneg eax\n" : "";
+                res += "\tmov ebx,"+valor2+"\n";
                 res+="\tmov eax,"+valor1+"\n";
                 break;
             case "*":
-                res+="\timul eax,"+valor2+"\n";
+                res+="\timul eax,ebx\n";
+                res += neg2 ? "\tneg ebx\n" : "";
+                res += neg1 ? "\tneg eax\n" : "";
+                res += "\tmov ebx,"+valor2+"\n";
                 res+="\tmov eax,"+valor1+"\n";
                 break;
             case "/":
-                res+="\tidiv "+valor2+"\n";
+                res+="\tidiv ebx\n";
+                res += neg2 ? "\tneg ebx\n" : "";
+                res += neg1 ? "\tneg eax\n" : "";
+                res += "\tmov ebx,"+valor2+"\n";
                 res+="\tmov eax,"+valor1+"\n";
                 break;
             case "//":
-                res+="\tidiv "+valor2+"\n";
+                res+="\tidiv ebx\n";
+                res += neg2 ? "\tneg ebx\n" : "";
+                res += neg1 ? "\tneg eax\n" : "";
+                res += "\tmov ebx,"+valor2+"\n";
                 res+="\tmov eax,"+valor1+"\n";
                 break;
             case "%":
                 res+="\tmov eax, edx\n";
-                res+="\tidiv "+valor2+"\n";
+                res+="\tidiv ebx\n";
+                res += neg2 ? "\tneg ebx\n" : "";
+                res += neg1 ? "\tneg eax\n" : "";
+                res += "\tmov ebx,"+valor2+"\n";
                 res+="\tmov eax,"+valor1+"\n";
                 break;
         }
         return res;
     }
-    private String generarCodigoOperacionFlotante(String valor1, String valor2, String operador) {
+    private String generarCodigoOperacionFlotante(String valor1, boolean neg1, String valor2, boolean neg2, String operador) {
         String res="";
         switch(operador)
         {
             case "+":
-                res+="\tmov eax,temp_float\n";
-                res+="\tfstp temp_float\n";
-                res+="\tfadd "+valor2+"\n";
-                res+="\tfld "+valor1+"\n";
+                res+="\tmov eax,[temp_float]\n";
+                res+="\tfstp [temp_float]\n";
+                res+="\tfadd \n";
+                res += neg2 ? "\tfsub\n\tfld 0\n"+"\tfld "+valor2+"\n" : "\tfld "+valor2+"\n";
+                res += neg1 ? "\tfsub\n\tfld 0\n"+"\tfld "+valor1+"\n" : "\tfld "+valor1+"\n";
                 break;
             case "-":
-                res+="\tmov eax,temp_float\n";
-                res+="\tfstp temp_float\n";
-                res+="\tfsub "+valor2+"\n";
-                res+="\tfld "+valor1+"\n";
+                res+="\tmov eax,[temp_float]\n";
+                res+="\tfstp [temp_float]\n";
+                res+="\tfsub \n";
+                res += neg1 ? "\tfsub\n\tfld 0\n"+"\tfld "+valor1+"\n" : "\tfld "+valor1+"\n";
+                res += neg2 ? "\tfsub\n\tfld 0\n"+"\tfld "+valor2+"\n" : "\tfld "+valor2+"\n";
                 break;
             case "*":
-                res+="\tmov eax,temp_float\n";
-                res+="\tfstp temp_float\n";
-                res+="\tfmul "+valor2+"\n";
-                res+="\tfld "+valor1+"\n";
+                res+="\tmov eax,[temp_float]\n";
+                res+="\tfstp [temp_float]\n";
+                res+="\tfmul \n";
+                res += neg1 ? "\tfsub\n\tfld 0\n"+"\tfld "+valor1+"\n" : "\tfld "+valor1+"\n";
+                res += neg2 ? "\tfsub\n\tfld 0\n"+"\tfld "+valor2+"\n" : "\tfld "+valor2+"\n";
                 break;
             case "/":
-                res+="\tmov eax,temp_float\n";
-                res+="\tfstp temp_float\n";
-                res+="\tfdiv "+valor2+"\n";
-                res+="\tfld "+valor1+"\n";
+                res+="\tmov eax,[temp_float]\n";
+                res+="\tfstp [temp_float]\n";
+                res+="\tfdiv \n";
+                res += neg1 ? "\tfsub\n\tfld 0\n"+"\tfld "+valor1+"\n" : "\tfld "+valor1+"\n";
+                res += neg2 ? "\tfsub\n\tfld 0\n"+"\tfld "+valor2+"\n" : "\tfld "+valor2+"\n";
                 break;
             case "//":
-                res+="\tidiv "+valor2+"\n";
-                res+="\tmov eax,"+valor1+"\n";
+                res+="\tidiv ebx\n";
+                res += neg2 ? "\tneg ebx\n" : "";
+                res += neg1 ? "\tneg eax\n" : "";
+                res += "\tmov ebx,"+valor2+"\n";
+                res += "\tmov eax,"+valor1+"\n";
                 break;
             case "%":
                 res+="\tmov eax, edx\n";
-                res+="\tidiv "+valor2+"\n";
+                res+="\tidiv ebx\n";
+                res += neg2 ? "\tneg ebx\n" : "";
+                res += neg1 ? "\tneg eax\n" : "";
+                res += "\tmov ebx,"+valor2+"\n";
                 res+="\tmov eax,"+valor1+"\n";
                 break;
         }
