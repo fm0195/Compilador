@@ -371,9 +371,13 @@ public class Analizador {
         return errores;
     }
     public void agregarArgumento(){
+        if (pilaSemantica.peek() instanceof ErrorSemantico){
+            pilaSemantica.pop();
+        }else{
         RegistroExpresion expresion=(RegistroExpresion)pilaSemantica.pop();
         codigoPrincipal.remove(codigoPrincipal.size()-1);
         argumentoTempLLamadoFuncion.add(expresion);
+        }
     }
     public void crearLlamdoFuncion(String nombre, int linea){
         RSId id = new RSId(nombre, linea);
@@ -512,6 +516,21 @@ public class Analizador {
                 pilaSemantica.push(e);
                 getErrores().add(e);
             }
+        }
+    }
+    public void asignarVariableFor(String id,int linea){
+        if(variablesGlobales.containsKey(id)){
+            variablesGlobales.get(id).setAsignada();
+        }else if(!validaParametro(id)){
+            for(int counter =0; counter<parametrosFuncionTemp.size();counter++){
+                if (parametrosFuncionTemp.get(counter).getNombre().equals(id)){
+                    parametrosFuncionTemp.get(counter).setAsignada();
+                }
+            }
+        }else{
+            ErrorSemantico e = new ErrorSemantico("variable "+id+", no asignada",linea);
+                getErrores().add(e);
+                pilaSemantica.push(e);
         }
     }
     

@@ -3131,6 +3131,7 @@ class CUP$Parser$actions {
         Nodo inN=new Nodo((String)((java_cup.runtime.Symbol)in).value);
         Nodo dosp=new Nodo((String)((java_cup.runtime.Symbol)dp).value);
         semantico.quitarMarca();
+        semantico.asignarVariableFor((String)((java_cup.runtime.Symbol)i).value, ((java_cup.runtime.Symbol)i).right);
         RESULT=new Nodo("Definición del ciclo For",new Nodo[]{forN,id,inN,(Nodo)af,dosp,(Nodo)cf,(Nodo)pc});
     
               CUP$Parser$result = parser.getSymbolFactory().newSymbol("for",30, ((java_cup.runtime.Symbol)CUP$Parser$stack.elementAt(CUP$Parser$top-6)), ((java_cup.runtime.Symbol)CUP$Parser$stack.peek()), RESULT);
