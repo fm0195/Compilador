@@ -34,7 +34,6 @@ public class RSId extends Registro{
         res+="Nombre: "+nombre+"\n";
         res+="Tipo: "+tipo+"\n";
         res+="Línea: "+linea+"\n";
-        res+="Fue asignada: "+isAsignada+"\n";
         res+="-----------------------------------------------------------------\n";
         return res;
     }

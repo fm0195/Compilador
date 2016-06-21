@@ -35,6 +35,9 @@ public class Funcion {
     public String toString(){
         ArrayList<RSId> variables=getVariablesLocales();
         String res = "FUNCIÓN\n";
+        res+="NOMBRE DE FUNCIÓN: "+nombre.getNombre()+"\n";
+        
+        res+="------------------------------------------------------------------------\n";
         res+="PARÁMETROS:\n";
         for (RSId parametro : parametros) {
             res+=parametro.toString();

@@ -1,7 +1,7 @@
 section .data
 	temp_float dd 0
 	par_fun_pow_x dw 0
-	par_fun_pow_y dw 0
+	var_fun_pow_y dw 0
 	temp1 dw 0
 	par_fun_hola_x dw 0
 	par_fun_hola_r db 0
@@ -36,13 +36,15 @@ section .data
 section .text
 	global _start
 pow:
+	mov var_fun_pow_y, 9
 Label-IF-ELSE0:
 	;operaciones para obtener el valor boleano
 	;cmp eax, resultadoBooleano
 	je Label-IF-ELSE2
 	jne Label-IF-ELSE3
 Label-IF-ELSE2:
-	mov eax,par_fun_pow_y
+	mov var_fun_pow_y, 9
+	mov eax,var_fun_pow_y
 	add eax,6
 	mov temp1,eax
 	mov eax,temp1
@@ -56,11 +58,7 @@ Label-IF-ELSE3:
 	je Label-IF-ELSE4
 	jne Label-IF-ELSE1
 Label-IF-ELSE4:
-	mov eax,par_fun_pow_x
-	add eax,par_fun_pow_y
-	mov temp2,eax
-	mov par_fun_pow_y, temp2
-	mov eax,5
+	mov eax,53
 	imul eax,par_fun_pow_x
 	mov temp2,eax
 	mov par_fun_pow_x, temp2
@@ -104,6 +102,12 @@ Label-IF-ELSE6:
 _start:
 	mov var_x, 5
 	mov var_i, 0
+	fld 8.9
+	fadd 6
+	fstp temp_float
+	mov eax,temp_float
+	mov temp6,eax
+	mov var_z, temp6
 Label-IF-ELSE8:
 	;operaciones para obtener el valor boleano
 	;cmp eax, resultadoBooleano
@@ -134,7 +138,10 @@ Label-IF-ELSE13:
 	je Label-IF-ELSE15
 	jne Label-IF-ELSE16
 Label-IF-ELSE15:
-	mov var_i, 9
+	mov eax,9
+	add eax,6
+	mov temp10,eax
+	mov var_i, temp10
 	jmp Label-IF-ELSE14
 Label-IF-ELSE16:
 	;operaciones para obtener el valor boleano

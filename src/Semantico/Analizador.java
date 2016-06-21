@@ -275,21 +275,27 @@ public class Analizador {
                                     break;
                                 }
                             }
-                        if (ValidarOperacion.getInstance().isAssignable(parametro.getTipo(),(((RegistroExpresion)pilaSemantica.peek()).getTipo()))){
-                            parametro.setAsignada();
-                            if (pilaSemantica.peek()==null){
-                                pilaSemantica.pop();
+                        if (!(pilaSemantica.peek() instanceof ErrorSemantico)){
+                            if (ValidarOperacion.getInstance().isAssignable(parametro.getTipo(),(((RegistroExpresion)pilaSemantica.peek()).getTipo()))){
+                                parametro.setAsignada();
+                                if (pilaSemantica.peek()==null){
+                                    pilaSemantica.pop();
+                                }
+                                RegistroExpresion temp=(RegistroExpresion) pilaSemantica.pop();
+                                Registro asignacion= new RSAsignacion( temp,var, var.getLinea());
+                                codigoPrincipal.remove(codigoPrincipal.size()-1);
+                                codigoPrincipal.add(asignacion);
+                                pilaSemantica.push(asignacion);
+                            }else{
+                                ErrorSemantico e = new ErrorSemantico(" variable "+var.getNombre()+", tipo: "+parametro.getTipo()+
+                                                            ", no puede ser asignada con un tipo: "+((RegistroExpresion)pilaSemantica.peek()).getTipo(), var.getLinea());
+                                getErrores().add(e);
+                                pilaSemantica.push(e);
                             }
-                            RegistroExpresion temp=(RegistroExpresion) pilaSemantica.pop();
-                            Registro asignacion= new RSAsignacion( temp,var, var.getLinea());
-                            codigoPrincipal.remove(codigoPrincipal.size()-1);
-                            codigoPrincipal.add(asignacion);
-                            pilaSemantica.push(asignacion);
                         }else{
-                            ErrorSemantico e = new ErrorSemantico(" variable "+var.getNombre()+", tipo: "+parametro.getTipo()+
-                                                        ", no puede ser asignada con un tipo: "+((RegistroExpresion)pilaSemantica.peek()).getTipo(), var.getLinea());
-                            getErrores().add(e);
-                            pilaSemantica.push(e);
+                            pilaSemantica.pop();
+                            codigoPrincipal.remove(codigoPrincipal.size()-1);
+                            return;
                         }
                   }
             }else{
@@ -503,6 +509,7 @@ public class Analizador {
             }
             else{
                 ErrorSemantico e = new ErrorSemantico(" expresion no puede ser negativa, tipo "+exp.getTipo(),exp.linea);
+                pilaSemantica.push(e);
                 getErrores().add(e);
             }
         }
