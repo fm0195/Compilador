@@ -50,7 +50,9 @@ parser code {:
                 erroresSintacticos().size()==0
                 && erroresSemanticos().size()==0){
             GeneradorCodigo generador = new GeneradorCodigo(path);
+            generador.generarFunciones(semantico.getFunciones());
             generador.generarVariablesGlobales(semantico.getVariablesGlobales());
+            generador.generarCodigo(semantico.getCodigoPrincipal());
             generador.generateAsmFile();
         }
     }
@@ -84,7 +86,7 @@ corcheteIndexado,argumentosFuncion, corcheteAux,
 variablesLocales, while, expresionBooleana,
 if,tryexcept,deffinally,for,alcanceFor,rangoObjetos,rango,defRango,
 objetoRango,elseIf, return,except,puntoComa, declaracionMultiple, argumentosInput,
-defClass,atributos,estructura2,programa;
+defClass,atributos,estructura2,programa,idFor;
 
 /* Precedences */
 precedence left OR;
@@ -348,14 +350,15 @@ return ::= RETURN:r expresion:e
             RESULT = new Nodo("CODIGO", new Nodo[]{id});
         :}
 ;
-for::=FOR:f ID:i IN:in alcanceFor:af DOSPUNTOS:dp codigoFuncion:cf puntoComa:pc
+
+
+for::=FOR:f idFor:i IN:in alcanceFor:af DOSPUNTOS:dp codigoFuncion:cf puntoComa:pc
     {:
         Nodo forN=new Nodo((String)((java_cup.runtime.Symbol)f).value);
-        Nodo id=new Nodo((String)((java_cup.runtime.Symbol)i).value);
         Nodo inN=new Nodo((String)((java_cup.runtime.Symbol)in).value);
         Nodo dosp=new Nodo((String)((java_cup.runtime.Symbol)dp).value);
         semantico.quitarMarca();
-        RESULT=new Nodo("Definición del ciclo For",new Nodo[]{forN,id,inN,(Nodo)af,dosp,(Nodo)cf,(Nodo)pc});
+        RESULT=new Nodo("Definición del ciclo For",new Nodo[]{forN,(Nodo)i,inN,(Nodo)af,dosp,(Nodo)cf,(Nodo)pc});
     :}
     |
     FOR:f error DOSPUNTOS:dp codigoFuncion:cf puntoComa:pc
@@ -376,7 +379,13 @@ for::=FOR:f ID:i IN:in alcanceFor:af DOSPUNTOS:dp codigoFuncion:cf puntoComa:pc
         RESULT=new Nodo("Definición del ciclo For",new Nodo[]{forN, dosp ,(Nodo)pc});
     :}
 ;
-
+idFor::= ID:i
+    {:
+        Nodo id=new Nodo((String)((java_cup.runtime.Symbol)i).value);
+        semantico.asignarVariableFor((String)((java_cup.runtime.Symbol)i).value, ((java_cup.runtime.Symbol)i).right);
+        RESULT = new Nodo("id", new Nodo[]{id});
+    :}
+;
 alcanceFor::=rangoObjetos:o
         {:
             RESULT=new Nodo("Rango de objetos",new Nodo[]{(Nodo)o});
@@ -1133,6 +1142,12 @@ expresion::=        expresion:o MAS:m expresion:ca
                     {:
                     addError(new Nodo("Error en la expresion, en la línea: "+_ultimaLineaDerecha));
                         RESULT = new Nodo("Error en la expresion, en la línea: "+_ultimaLineaDerecha);
+                    :}
+                    |
+                    expresionBooleana:e
+                    {:
+                        semantico.quitarMarca();
+                        RESULT = new Nodo("Expresion booleana",new Nodo[]{(Nodo)e});
                     :}
                     |
                     MENOS:m expresion:ca

@@ -242,21 +242,28 @@ public class Analizador {
                             return;
                         }
                     }
-                    if (variablesGlobales.get(var.getNombre()).getTipo().equals(((RegistroExpresion)pilaSemantica.peek()).getTipo())){
-                        variablesGlobales.get(var.getNombre()).setAsignada();
-                        if (pilaSemantica.peek()==null){
-                            pilaSemantica.pop();
+                    
+                    if (!(pilaSemantica.peek() instanceof ErrorSemantico)){
+                        if (variablesGlobales.get(var.getNombre()).getTipo().equals(((RegistroExpresion)pilaSemantica.peek()).getTipo())){
+                            variablesGlobales.get(var.getNombre()).setAsignada();
+                            if (pilaSemantica.peek()==null){
+                                pilaSemantica.pop();
+                            }
+                            RegistroExpresion temp=(RegistroExpresion) pilaSemantica.pop();
+                            Registro asignacion= new RSAsignacion( temp,var, var.getLinea());
+                            codigoPrincipal.remove(codigoPrincipal.size()-1);
+                            codigoPrincipal.add(asignacion);
+                            pilaSemantica.push(asignacion);
+                        }else{
+                            ErrorSemantico e = new ErrorSemantico(" variable "+var.getNombre()+", tipo: "+variablesGlobales.get(var.getNombre()).getTipo()+
+                                                        ", no puede ser asignada con un tipo: "+((RegistroExpresion)pilaSemantica.peek()).getTipo(), var.getLinea());
+                            getErrores().add(e);
+                            pilaSemantica.push(e);
                         }
-                        RegistroExpresion temp=(RegistroExpresion) pilaSemantica.pop();
-                        Registro asignacion= new RSAsignacion( temp,var, var.getLinea());
-                        codigoPrincipal.remove(codigoPrincipal.size()-1);
-                        codigoPrincipal.add(asignacion);
-                        pilaSemantica.push(asignacion);
                     }else{
-                        ErrorSemantico e = new ErrorSemantico(" variable "+var.getNombre()+", tipo: "+variablesGlobales.get(var.getNombre()).getTipo()+
-                                                    ", no puede ser asignada con un tipo: "+((RegistroExpresion)pilaSemantica.peek()).getTipo(), var.getLinea());
-                        getErrores().add(e);
-                        pilaSemantica.push(e);
+                            pilaSemantica.pop();
+                            codigoPrincipal.remove(codigoPrincipal.size()-1);
+                            return;
                     }
               }
             }else if (!validaParametro(var.getNombre())){
