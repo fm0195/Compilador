@@ -22,6 +22,8 @@ public class GeneradorCodigo {
     this.path = path.substring(0, index)+".asm";
     variablesBuffer = new StringBuffer("section .data\n\ttemp_float dd 0\n");
     codigoBuffer = new StringBuffer("section .text\n\tglobal _start\n");
+    String res = "\ttemp"+ tempCounter+" "+"dw"+" 0\n";
+    variablesBuffer.append(res);
   }
   private String generarLabelIF(){
       String label = "Label-IF-ELSE"+labelCounter;
