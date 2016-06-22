@@ -15,6 +15,8 @@ public class GeneradorCodigo {
     private HashMap<String, String> hashVariables=new HashMap<>();
     private int labelCounter=0;
     private int tempCounter=1;
+    boolean potenciaEntera=false;
+    boolean potenciaFlotante=false;
 
   public GeneradorCodigo(String path) {
     int index;
@@ -100,6 +102,30 @@ public class GeneradorCodigo {
   }
     
     public void generateAsmFile() throws FileNotFoundException, IOException{
+        if(potenciaEntera){
+            String res = "\npotenciaEntera proc\n" +
+                            "\tmov eax,ebx\n" +
+                            "\tdec ecx\n" +
+                            "\tcmp exc,0\n" +
+                            "\tjle fin\n" +
+                            "ciclo:\n" +
+                            "\timul eax,ebx\n" +
+                            "\tloop ciclo\n" +
+                            "fin:\n" +
+                            "\tret\n" +
+                            "potenciaEntera endproc\n";
+            codigoBuffer.append(res);
+        }
+        if(potenciaFlotante){
+            String res = "\npotenciaFlotante proc\n" +
+                        "\tfyl2x                        \n" +
+                        "\tf2xm1                        \n" +
+                        "\tfld1                        \n" +
+                        "\tfaddp st(1),st(0)        \n" +
+                        "\tret                        \n" +
+                        "potenciaFlotante endp\n";
+            codigoBuffer.append(res);
+        }
         String codigo = variablesBuffer.toString()+codigoBuffer.toString();
         ManagerFile managerFile = new ManagerFile();
         managerFile.createFile(path, codigo);
@@ -148,7 +174,7 @@ public class GeneradorCodigo {
                                 String res="";
                                 res += revertir(generarExpresionEntero(expresion, "[temp"+tempCounter+"]"));
                                 res += "\tmov eax, [temp"+i+"]\n";
-                                res += "\tmov ["+variable+"], eax";
+                                res += "\tmov ["+variable+"], eax\n";
                                 codigoBuffer.append(res);
                                 break;
                             }
@@ -157,7 +183,7 @@ public class GeneradorCodigo {
                                 String res="";
                                 res += revertir(generarExpresionFlotante(expresion, "[temp"+tempCounter+"]"));
                                 res += "\tmov eax, [temp"+i+"]\n";
-                                res += "\tmov ["+variable+"], eax";
+                                res += "\tmov ["+variable+"], eax\n";
                                 codigoBuffer.append(res);
                                 break;
                             }
@@ -299,6 +325,15 @@ public class GeneradorCodigo {
                 res += "\tmov ebx,"+valor2+"\n";
                 res+="\tmov eax,"+valor1+"\n";
                 break;
+            case "**":
+                potenciaEntera = true;
+                res+="\tcall potenciaEntera\n";
+                res+="\tmov eax,0\n";
+                res += neg2 ? "\tneg ecx\n" : "";
+                res += neg1 ? "\tneg ebx\n" : "";
+                res += "\tmov ecx,"+valor2+"\n";
+                res+="\tmov ebx,"+valor1+"\n";
+                break;
         }
         return res;
     }
@@ -348,6 +383,14 @@ public class GeneradorCodigo {
                 res += neg1 ? "\tneg eax\n" : "";
                 res += "\tmov ebx,"+valor2+"\n";
                 res+="\tmov eax,"+valor1+"\n";
+                break;
+            case "**":
+                potenciaFlotante=true;
+                res+="\tmov eax,[temp_float]\n";
+                res+="\tfstp [temp_float]\n";
+                res+="\tcall potenciaFlotante \n";
+                res += neg1 ? "\tfsub\n\tfld 0\n"+"\tfld "+valor1+"\n" : "\tfld "+valor1+"\n";
+                res += neg2 ? "\tfsub\n\tfld 0\n"+"\tfld "+valor2+"\n" : "\tfld "+valor2+"\n";
                 break;
         }
         return res;
