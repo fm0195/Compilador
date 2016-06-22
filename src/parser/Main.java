@@ -45,14 +45,14 @@ public class Main {
         Symbol res = p.parse();
         p.generarCodigo(pathPuntoMyPython);
         Printer printer=new Printer();
-        printer.impimirDatos("Errores Léxicos en el programa", p.erroresLexicos());
-        printer.impimirDatos("Errores Sintácticos en el programa", p.erroresSintacticos());
-        printer.impimirDatos("Errores Semánticos en el programa", p.erroresSemanticos());
             System.out.println("\n");
             System.out.println(p.getTabla());
           System.out.println("\n");
-          System.out.println("ARBOL GENERADO POR EL PARSER");
-        System.out.println(((Nodo)res.value).toString(0));
+    printer.impimirDatos("Errores Léxicos en el programa", p.erroresLexicos());
+    printer.impimirDatos("Errores Sintácticos en el programa", p.erroresSintacticos());
+    printer.impimirDatos("Errores Semánticos en el programa", p.erroresSemanticos());
+          //System.out.println("ARBOL GENERADO POR EL PARSER");
+        //System.out.println(((Nodo)res.value).toString(0));
       } catch (FileNotFoundException ex) {
             System.out.println("Error en el archivo.");
        // Logger.getLogger(Scanner.class.getName()).log(Level.SEVERE, null, ex);

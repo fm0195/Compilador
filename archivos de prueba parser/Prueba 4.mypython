@@ -1,19 +1,21 @@
-def e():
-	try
-	except
-		if 3:
-			while 4:
-				True
-		else
-			x=9
-	finally:
-		for in range
-			True
-		
-def f():
-	h=2+2
+def funcion2(int a, int b) :
+	float a, b, c
+	boolean g k # error por la coma
 
-int r
-list e
 
-c=9
+	a= a*e
+;
+
+
+int g, y, x
+float a, b, c
+boolean g k # error por la coma
+char z, t, y, y 
+y      
+
+int k   # da error por la linea anterior
+
+
+#Programa
+
+a = a * b
